@@ -14,6 +14,90 @@ function generateId() {
   return Math.random().toString(36).substring(2, 9);
 }
 
+interface Template {
+  name: string;
+  emoji: string;
+  description: string;
+  releases: Release[];
+}
+
+const templates: Template[] = [
+  {
+    name: 'Product Launch',
+    emoji: '🚀',
+    description: 'First release with core features',
+    releases: [{
+      version: '1.0.0',
+      date: new Date().toISOString().split('T')[0],
+      changes: [
+        { id: generateId(), type: 'added', description: 'Initial release' },
+        { id: generateId(), type: 'added', description: 'Core feature implementation' },
+        { id: generateId(), type: 'added', description: 'User authentication' },
+        { id: generateId(), type: 'added', description: 'Documentation' },
+      ]
+    }]
+  },
+  {
+    name: 'Bug Fix',
+    emoji: '🐛',
+    description: 'Patch release with fixes',
+    releases: [{
+      version: '1.0.1',
+      date: new Date().toISOString().split('T')[0],
+      changes: [
+        { id: generateId(), type: 'fixed', description: 'Fixed critical bug in...' },
+        { id: generateId(), type: 'fixed', description: 'Resolved edge case where...' },
+        { id: generateId(), type: 'changed', description: 'Improved error handling' },
+      ]
+    }]
+  },
+  {
+    name: 'Security Update',
+    emoji: '🔒',
+    description: 'Critical security patches',
+    releases: [{
+      version: '1.0.2',
+      date: new Date().toISOString().split('T')[0],
+      changes: [
+        { id: generateId(), type: 'security', description: 'Patched XSS vulnerability in...' },
+        { id: generateId(), type: 'security', description: 'Updated dependencies to fix CVE-...' },
+        { id: generateId(), type: 'changed', description: 'Enhanced input validation' },
+      ]
+    }]
+  },
+  {
+    name: 'Major Update',
+    emoji: '✨',
+    description: 'New features & improvements',
+    releases: [{
+      version: '2.0.0',
+      date: new Date().toISOString().split('T')[0],
+      changes: [
+        { id: generateId(), type: 'added', description: 'New feature: ...' },
+        { id: generateId(), type: 'added', description: 'Added support for...' },
+        { id: generateId(), type: 'changed', description: 'Redesigned UI for...' },
+        { id: generateId(), type: 'changed', description: 'Improved performance by...' },
+        { id: generateId(), type: 'deprecated', description: 'Old API endpoints' },
+      ]
+    }]
+  },
+  {
+    name: 'Breaking Changes',
+    emoji: '💥',
+    description: 'Major version with breaking changes',
+    releases: [{
+      version: '3.0.0',
+      date: new Date().toISOString().split('T')[0],
+      changes: [
+        { id: generateId(), type: 'changed', description: 'BREAKING: Changed API response format' },
+        { id: generateId(), type: 'removed', description: 'BREAKING: Removed deprecated v1 endpoints' },
+        { id: generateId(), type: 'added', description: 'New v3 API with improved performance' },
+        { id: generateId(), type: 'changed', description: 'Updated minimum Node.js version to 18' },
+      ]
+    }]
+  },
+];
+
 export default function Home() {
   const [releases, setReleases] = useState<Release[]>([
     {
@@ -24,6 +108,17 @@ export default function Home() {
   ]);
   const [exportFormat, setExportFormat] = useState<'markdown' | 'json'>('markdown');
   const [copied, setCopied] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  const applyTemplate = useCallback((template: Template) => {
+    // Regenerate IDs to avoid duplicates
+    const newReleases = template.releases.map(r => ({
+      ...r,
+      changes: r.changes.map(c => ({ ...c, id: generateId() }))
+    }));
+    setReleases(newReleases);
+    setShowTemplates(false);
+  }, []);
 
   const addRelease = useCallback(() => {
     const lastVersion = releases[0]?.version || '0.0.0';
@@ -133,6 +228,32 @@ export default function Home() {
           <p className="text-zinc-400 text-lg max-w-md mx-auto">
             Generate beautiful changelogs for your releases
           </p>
+
+          {/* Template Quick Start */}
+          <div className="mt-6">
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-all"
+            >
+              📋 {showTemplates ? 'Hide Templates' : 'Start from Template'}
+            </button>
+            
+            {showTemplates && (
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 max-w-3xl mx-auto fade-in">
+                {templates.map((template, i) => (
+                  <button
+                    key={i}
+                    onClick={() => applyTemplate(template)}
+                    className="flex flex-col items-center gap-2 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all group"
+                  >
+                    <span className="text-2xl">{template.emoji}</span>
+                    <span className="text-sm font-medium text-white group-hover:text-emerald-400">{template.name}</span>
+                    <span className="text-xs text-zinc-500 text-center">{template.description}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
