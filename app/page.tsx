@@ -158,28 +158,30 @@ export default function Home() {
                   className="release-card rounded-2xl p-5 fade-in"
                 >
                   {/* Version & Date */}
-                  <div className="flex gap-3 mb-4">
-                    <div className="flex-1">
-                      <label className="text-xs text-zinc-500 mb-1 block">Version</label>
-                      <input
-                        type="text"
-                        value={release.version}
-                        onChange={e => updateRelease(releaseIndex, { version: e.target.value })}
-                        placeholder="1.0.0"
-                        className="input-field w-full rounded-lg px-3 py-2 text-white text-sm"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-xs text-zinc-500 mb-1 block">Date</label>
-                      <input
-                        type="date"
-                        value={release.date}
-                        onChange={e => updateRelease(releaseIndex, { date: e.target.value })}
-                        className="input-field w-full rounded-lg px-3 py-2 text-white text-sm"
-                      />
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
+                    <div className="flex gap-2 sm:gap-3 flex-1">
+                      <div className="flex-1">
+                        <label className="text-xs text-zinc-500 mb-1 block">Version</label>
+                        <input
+                          type="text"
+                          value={release.version}
+                          onChange={e => updateRelease(releaseIndex, { version: e.target.value })}
+                          placeholder="1.0.0"
+                          className="input-field w-full rounded-lg px-3 py-2 text-white text-sm"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs text-zinc-500 mb-1 block">Date</label>
+                        <input
+                          type="date"
+                          value={release.date}
+                          onChange={e => updateRelease(releaseIndex, { date: e.target.value })}
+                          className="input-field w-full rounded-lg px-3 py-2 text-white text-sm"
+                        />
+                      </div>
                     </div>
                     {releases.length > 1 && (
-                      <div className="flex items-end">
+                      <div className="flex items-end justify-end sm:justify-start">
                         <button
                           onClick={() => deleteRelease(releaseIndex)}
                           className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -194,15 +196,15 @@ export default function Home() {
                   </div>
 
                   {/* Change Type Badges */}
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5 sm:gap-2 mb-4">
                     {(Object.keys(changeTypeConfig) as ChangeType[]).map(type => (
                       <button
                         key={type}
                         onClick={() => addChange(releaseIndex, type)}
-                        className={`${badgeClass(type)} px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5`}
+                        className={`${badgeClass(type)} px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 sm:gap-1.5`}
                       >
                         <span>{changeTypeConfig[type].emoji}</span>
-                        <span>{changeTypeConfig[type].label}</span>
+                        <span className="hidden sm:inline">{changeTypeConfig[type].label}</span>
                       </button>
                     ))}
                   </div>
@@ -249,9 +251,9 @@ export default function Home() {
 
           {/* Preview Panel */}
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h2 className="text-lg font-semibold text-white">Preview</h2>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                 <div className="flex p-1 bg-zinc-900 rounded-lg">
                   <button
                     onClick={() => setExportFormat('markdown')}
@@ -261,7 +263,7 @@ export default function Home() {
                         : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
-                    Markdown
+                    MD
                   </button>
                   <button
                     onClick={() => setExportFormat('json')}
@@ -276,7 +278,7 @@ export default function Home() {
                 </div>
                 <button
                   onClick={copyToClipboard}
-                  className={`btn-secondary px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+                  className={`btn-secondary px-3 sm:px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 sm:gap-2 ${
                     copied ? 'copy-success' : 'text-zinc-300'
                   }`}
                 >
@@ -285,7 +287,8 @@ export default function Home() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Copied!
+                      <span className="hidden sm:inline">Copied!</span>
+                      <span className="sm:hidden">✓</span>
                     </>
                   ) : (
                     <>
@@ -298,17 +301,18 @@ export default function Home() {
                 </button>
                 <button
                   onClick={downloadFile}
-                  className="btn-secondary px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 text-zinc-300"
+                  className="btn-secondary px-3 sm:px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 sm:gap-2 text-zinc-300"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Download
+                  <span className="hidden sm:inline">Download</span>
+                  <span className="sm:hidden">Save</span>
                 </button>
               </div>
             </div>
 
-            <div className="glass-panel rounded-2xl p-5 min-h-[400px] max-h-[600px] overflow-auto custom-scrollbar">
+            <div className="glass-panel rounded-2xl p-4 sm:p-5 min-h-[300px] sm:min-h-[400px] max-h-[400px] sm:max-h-[600px] overflow-auto custom-scrollbar">
               <pre className="code-preview text-zinc-300 whitespace-pre-wrap">
                 {getExport() || (
                   <span className="text-zinc-600">Add some changes to see the preview...</span>
