@@ -7,7 +7,8 @@ import {
   type ChangeType, 
   changeTypeConfig,
   generateMarkdown,
-  generateJSON 
+  generateJSON,
+  generateHTML
 } from '@/lib/types';
 
 function generateId() {
@@ -106,7 +107,7 @@ export default function Home() {
       changes: []
     }
   ]);
-  const [exportFormat, setExportFormat] = useState<'markdown' | 'json'>('markdown');
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html'>('markdown');
   const [copied, setCopied] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
@@ -171,9 +172,9 @@ export default function Home() {
       changes: r.changes.filter(c => c.description.trim())
     })).filter(r => r.changes.length > 0);
     
-    return exportFormat === 'markdown' 
-      ? generateMarkdown(filtered)
-      : generateJSON(filtered);
+    if (exportFormat === 'markdown') return generateMarkdown(filtered);
+    if (exportFormat === 'json') return generateJSON(filtered);
+    return generateHTML(filtered);
   }, [releases, exportFormat]);
 
   const copyToClipboard = useCallback(async () => {
@@ -184,14 +185,14 @@ export default function Home() {
 
   const downloadFile = useCallback(() => {
     const content = getExport();
-    const filename = exportFormat === 'markdown' ? 'CHANGELOG.md' : 'changelog.json';
-    const mimeType = exportFormat === 'markdown' ? 'text/markdown' : 'application/json';
+    const filenames = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html' };
+    const mimeTypes = { markdown: 'text/markdown', json: 'application/json', html: 'text/html' };
     
-    const blob = new Blob([content], { type: mimeType });
+    const blob = new Blob([content], { type: mimeTypes[exportFormat] });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = filenames[exportFormat];
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -395,6 +396,16 @@ export default function Home() {
                     }`}
                   >
                     JSON
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('html')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      exportFormat === 'html'
+                        ? 'bg-zinc-800 text-white'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    HTML
                   </button>
                 </div>
                 <button
