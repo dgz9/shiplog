@@ -35,6 +35,41 @@ function clearSavedReleases() {
   localStorage.removeItem('shiplog-autosave-time');
 }
 
+// Version history helpers
+interface VersionSnapshot {
+  id: string;
+  name: string;
+  releases: Release[];
+  createdAt: string;
+}
+
+function getVersionHistory(): VersionSnapshot[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem('shiplog-versions') || '[]');
+  } catch { return []; }
+}
+
+function saveVersion(name: string, releases: Release[]): VersionSnapshot[] {
+  const history = getVersionHistory();
+  const newVersion: VersionSnapshot = {
+    id: Math.random().toString(36).substring(2, 9),
+    name,
+    releases: JSON.parse(JSON.stringify(releases)), // Deep clone
+    createdAt: new Date().toISOString()
+  };
+  // Keep last 10 versions
+  const updated = [...history, newVersion].slice(-10);
+  localStorage.setItem('shiplog-versions', JSON.stringify(updated));
+  return updated;
+}
+
+function deleteVersion(id: string): VersionSnapshot[] {
+  const history = getVersionHistory().filter(v => v.id !== id);
+  localStorage.setItem('shiplog-versions', JSON.stringify(history));
+  return history;
+}
+
 function getLastSaveTime(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('shiplog-autosave-time');
@@ -138,8 +173,12 @@ export default function Home() {
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+  const [versionHistory, setVersionHistory] = useState<VersionSnapshot[]>([]);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versionName, setVersionName] = useState('');
+  const [showSaveVersion, setShowSaveVersion] = useState(false);
 
-  // Load saved releases on mount
+  // Load saved releases and version history on mount
   useEffect(() => {
     const saved = getSavedReleases();
     const savedTime = getLastSaveTime();
@@ -153,6 +192,7 @@ export default function Home() {
     if (savedTime) {
       setLastSaved(savedTime);
     }
+    setVersionHistory(getVersionHistory());
   }, []);
 
   // Auto-save when releases change (debounced)
@@ -181,6 +221,29 @@ export default function Home() {
     clearSavedReleases();
     setShowRestorePrompt(false);
     setLastSaved(null);
+  }, []);
+
+  const handleSaveVersion = useCallback(() => {
+    const name = versionName.trim() || `v${releases[0]?.version || '1.0.0'} - ${new Date().toLocaleDateString()}`;
+    const updated = saveVersion(name, releases);
+    setVersionHistory(updated);
+    setShowSaveVersion(false);
+    setVersionName('');
+  }, [releases, versionName]);
+
+  const handleRestoreVersion = useCallback((version: VersionSnapshot) => {
+    // Regenerate IDs to avoid duplicates
+    const restoredReleases = version.releases.map(r => ({
+      ...r,
+      changes: r.changes.map(c => ({ ...c, id: generateId() }))
+    }));
+    setReleases(restoredReleases);
+    setShowVersions(false);
+  }, []);
+
+  const handleDeleteVersion = useCallback((id: string) => {
+    const updated = deleteVersion(id);
+    setVersionHistory(updated);
   }, []);
 
   const applyTemplate = useCallback((template: Template) => {
@@ -313,14 +376,35 @@ export default function Home() {
             Generate beautiful changelogs for your releases
           </p>
 
-          {/* Template Quick Start */}
-          <div className="mt-6">
+          {/* Template Quick Start & Version History */}
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
             <button
-              onClick={() => setShowTemplates(!showTemplates)}
+              onClick={() => { setShowTemplates(!showTemplates); setShowVersions(false); }}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                showTemplates
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              📋 Templates
+            </button>
+            <button
+              onClick={() => { setShowVersions(!showVersions); setShowTemplates(false); }}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                showVersions
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              📚 Versions {versionHistory.length > 0 && `(${versionHistory.length})`}
+            </button>
+            <button
+              onClick={() => setShowSaveVersion(true)}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-all"
             >
-              📋 {showTemplates ? 'Hide Templates' : 'Start from Template'}
+              💾 Save Version
             </button>
+          </div>
             
             {showTemplates && (
               <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 max-w-3xl mx-auto fade-in">
@@ -337,7 +421,83 @@ export default function Home() {
                 ))}
               </div>
             )}
-          </div>
+            
+            {/* Version History Panel */}
+            {showVersions && (
+              <div className="mt-4 max-w-2xl mx-auto fade-in">
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <span>📚</span> Saved Versions
+                  </h3>
+                  {versionHistory.length === 0 ? (
+                    <p className="text-zinc-500 text-center py-4">No saved versions yet. Click "Save Version" to create a snapshot!</p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {[...versionHistory].reverse().map((version) => (
+                        <div
+                          key={version.id}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-all group"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-medium truncate">{version.name}</p>
+                            <p className="text-xs text-zinc-500">
+                              {new Date(version.createdAt).toLocaleString()} • {version.releases.length} release{version.releases.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleRestoreVersion(version)}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-xs font-medium transition-all"
+                            >
+                              Restore
+                            </button>
+                            <button
+                              onClick={() => handleDeleteVersion(version.id)}
+                              className="px-2 py-1.5 text-red-400 hover:bg-red-500/20 rounded-lg text-xs transition-all"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Save Version Modal */}
+            {showSaveVersion && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 fade-in">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-md w-full mx-4">
+                  <h3 className="text-xl font-semibold text-white mb-4">💾 Save Version</h3>
+                  <p className="text-zinc-400 text-sm mb-4">
+                    Create a snapshot of your current changelog that you can restore later.
+                  </p>
+                  <input
+                    type="text"
+                    value={versionName}
+                    onChange={(e) => setVersionName(e.target.value)}
+                    placeholder={`v${releases[0]?.version || '1.0.0'} - ${new Date().toLocaleDateString()}`}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500 mb-4"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => { setShowSaveVersion(false); setVersionName(''); }}
+                      className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 text-sm font-medium transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveVersion}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-sm font-medium transition-all"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Restore Prompt */}
