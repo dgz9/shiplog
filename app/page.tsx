@@ -70,6 +70,67 @@ function deleteVersion(id: string): VersionSnapshot[] {
   return history;
 }
 
+// Compare two version snapshots and return differences
+interface VersionDiff {
+  added: { release: string; change: string }[];
+  removed: { release: string; change: string }[];
+  modified: { release: string; oldVersion: string; newVersion: string }[];
+}
+
+function compareVersions(older: VersionSnapshot, newer: VersionSnapshot): VersionDiff {
+  const diff: VersionDiff = { added: [], removed: [], modified: [] };
+  
+  // Create maps for easier comparison
+  const olderChanges = new Set<string>();
+  const newerChanges = new Set<string>();
+  const olderVersions = new Map<string, string>();
+  const newerVersions = new Map<string, string>();
+  
+  older.releases.forEach(r => {
+    olderVersions.set(r.version, r.date);
+    r.changes.forEach(c => olderChanges.add(`${r.version}::${c.type}::${c.description}`));
+  });
+  
+  newer.releases.forEach(r => {
+    newerVersions.set(r.version, r.date);
+    r.changes.forEach(c => newerChanges.add(`${r.version}::${c.type}::${c.description}`));
+  });
+  
+  // Find added changes
+  newerChanges.forEach(change => {
+    if (!olderChanges.has(change)) {
+      const [release, , desc] = change.split('::');
+      if (desc) diff.added.push({ release, change: desc });
+    }
+  });
+  
+  // Find removed changes
+  olderChanges.forEach(change => {
+    if (!newerChanges.has(change)) {
+      const [release, , desc] = change.split('::');
+      if (desc) diff.removed.push({ release, change: desc });
+    }
+  });
+  
+  // Find modified version numbers
+  newerVersions.forEach((date, version) => {
+    if (!olderVersions.has(version)) {
+      // Check if this might be a version rename
+      const oldVersions = Array.from(olderVersions.keys());
+      const newVersions = Array.from(newerVersions.keys());
+      if (oldVersions.length === newVersions.length && oldVersions.length > 0) {
+        // Might be a version number change
+        const oldV = oldVersions.find(v => !newerVersions.has(v));
+        if (oldV) {
+          diff.modified.push({ release: 'Version', oldVersion: oldV, newVersion: version });
+        }
+      }
+    }
+  });
+  
+  return diff;
+}
+
 function getLastSaveTime(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('shiplog-autosave-time');
@@ -177,6 +238,9 @@ export default function Home() {
   const [showVersions, setShowVersions] = useState(false);
   const [versionName, setVersionName] = useState('');
   const [showSaveVersion, setShowSaveVersion] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareVersions, setCompareVersions] = useState<[VersionSnapshot | null, VersionSnapshot | null]>([null, null]);
+  const [versionDiff, setVersionDiff] = useState<VersionDiff | null>(null);
 
   // Load saved releases and version history on mount
   useEffect(() => {
@@ -244,6 +308,29 @@ export default function Home() {
   const handleDeleteVersion = useCallback((id: string) => {
     const updated = deleteVersion(id);
     setVersionHistory(updated);
+  }, []);
+
+  const handleSelectForCompare = useCallback((version: VersionSnapshot) => {
+    setCompareVersions(prev => {
+      if (!prev[0]) return [version, null];
+      if (prev[0].id === version.id) return [null, null]; // Deselect
+      if (!prev[1]) {
+        // Compute diff
+        const older = new Date(prev[0].createdAt) < new Date(version.createdAt) ? prev[0] : version;
+        const newer = older === prev[0] ? version : prev[0];
+        setVersionDiff(compareVersions(older, newer));
+        return [prev[0], version];
+      }
+      // Reset and start new selection
+      setVersionDiff(null);
+      return [version, null];
+    });
+  }, []);
+
+  const exitCompareMode = useCallback(() => {
+    setCompareMode(false);
+    setCompareVersions([null, null]);
+    setVersionDiff(null);
   }, []);
 
   const applyTemplate = useCallback((template: Template) => {
@@ -389,7 +476,7 @@ export default function Home() {
               📋 Templates
             </button>
             <button
-              onClick={() => { setShowVersions(!showVersions); setShowTemplates(false); }}
+              onClick={() => { setShowVersions(!showVersions); setShowTemplates(false); exitCompareMode(); }}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                 showVersions
                   ? 'bg-blue-600 text-white'
@@ -398,6 +485,18 @@ export default function Home() {
             >
               📚 Versions {versionHistory.length > 0 && `(${versionHistory.length})`}
             </button>
+            {versionHistory.length >= 2 && (
+              <button
+                onClick={() => { setCompareMode(!compareMode); setShowVersions(true); setShowTemplates(false); if (compareMode) exitCompareMode(); }}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  compareMode
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                }`}
+              >
+                🔀 Compare
+              </button>
+            )}
             <button
               onClick={() => setShowSaveVersion(true)}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-all"
@@ -427,39 +526,112 @@ export default function Home() {
               <div className="mt-4 max-w-2xl mx-auto fade-in">
                 <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <span>📚</span> Saved Versions
+                    <span>{compareMode ? '🔀' : '📚'}</span> {compareMode ? 'Compare Versions' : 'Saved Versions'}
+                    {compareMode && (
+                      <span className="text-xs text-purple-400 font-normal ml-2">
+                        Select 2 versions to compare
+                      </span>
+                    )}
                   </h3>
                   {versionHistory.length === 0 ? (
                     <p className="text-zinc-500 text-center py-4">No saved versions yet. Click "Save Version" to create a snapshot!</p>
                   ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {[...versionHistory].reverse().map((version) => (
-                        <div
-                          key={version.id}
-                          className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-all group"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white font-medium truncate">{version.name}</p>
-                            <p className="text-xs text-zinc-500">
-                              {new Date(version.createdAt).toLocaleString()} • {version.releases.length} release{version.releases.length !== 1 ? 's' : ''}
-                            </p>
+                      {[...versionHistory].reverse().map((version) => {
+                        const isSelected = compareVersions[0]?.id === version.id || compareVersions[1]?.id === version.id;
+                        return (
+                          <div
+                            key={version.id}
+                            className={`flex items-center gap-3 p-3 rounded-lg transition-all group ${
+                              compareMode 
+                                ? isSelected 
+                                  ? 'bg-purple-500/20 border border-purple-500/40' 
+                                  : 'bg-zinc-800/50 hover:bg-zinc-800 cursor-pointer'
+                                : 'bg-zinc-800/50 hover:bg-zinc-800'
+                            }`}
+                            onClick={() => compareMode && handleSelectForCompare(version)}
+                          >
+                            {compareMode && (
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                isSelected ? 'border-purple-500 bg-purple-500' : 'border-zinc-600'
+                              }`}>
+                                {isSelected && <span className="text-white text-xs">✓</span>}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white font-medium truncate">{version.name}</p>
+                              <p className="text-xs text-zinc-500">
+                                {new Date(version.createdAt).toLocaleString()} • {version.releases.length} release{version.releases.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                            {!compareMode && (
+                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleRestoreVersion(version)}
+                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-xs font-medium transition-all"
+                                >
+                                  Restore
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteVersion(version.id)}
+                                  className="px-2 py-1.5 text-red-400 hover:bg-red-500/20 rounded-lg text-xs transition-all"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => handleRestoreVersion(version)}
-                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-xs font-medium transition-all"
-                            >
-                              Restore
-                            </button>
-                            <button
-                              onClick={() => handleDeleteVersion(version.id)}
-                              className="px-2 py-1.5 text-red-400 hover:bg-red-500/20 rounded-lg text-xs transition-all"
-                            >
-                              ✕
-                            </button>
-                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Diff Display */}
+                  {compareMode && versionDiff && (
+                    <div className="mt-4 pt-4 border-t border-zinc-700">
+                      <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                        📊 Differences
+                        <span className="text-xs text-zinc-500 font-normal">
+                          ({compareVersions[0]?.name} → {compareVersions[1]?.name})
+                        </span>
+                      </h4>
+                      
+                      {versionDiff.added.length === 0 && versionDiff.removed.length === 0 && versionDiff.modified.length === 0 ? (
+                        <p className="text-zinc-500 text-sm text-center py-2">No differences found</p>
+                      ) : (
+                        <div className="space-y-3 max-h-48 overflow-y-auto">
+                          {versionDiff.added.length > 0 && (
+                            <div>
+                              <p className="text-xs text-green-400 font-medium mb-1">+ Added ({versionDiff.added.length})</p>
+                              {versionDiff.added.map((item, i) => (
+                                <div key={i} className="text-xs text-green-300/80 pl-3 py-0.5">
+                                  <span className="text-zinc-500">[{item.release}]</span> {item.change}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {versionDiff.removed.length > 0 && (
+                            <div>
+                              <p className="text-xs text-red-400 font-medium mb-1">- Removed ({versionDiff.removed.length})</p>
+                              {versionDiff.removed.map((item, i) => (
+                                <div key={i} className="text-xs text-red-300/80 pl-3 py-0.5">
+                                  <span className="text-zinc-500">[{item.release}]</span> {item.change}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {versionDiff.modified.length > 0 && (
+                            <div>
+                              <p className="text-xs text-yellow-400 font-medium mb-1">~ Modified ({versionDiff.modified.length})</p>
+                              {versionDiff.modified.map((item, i) => (
+                                <div key={i} className="text-xs text-yellow-300/80 pl-3 py-0.5">
+                                  {item.release}: {item.oldVersion} → {item.newVersion}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
                 </div>
