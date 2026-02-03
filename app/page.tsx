@@ -11,6 +11,17 @@ import {
   generateHTML
 } from '@/lib/types';
 
+// Theme helpers
+function getTheme(): 'dark' | 'light' {
+  if (typeof window === 'undefined') return 'dark';
+  return (localStorage.getItem('shiplog-theme') as 'dark' | 'light') || 'dark';
+}
+
+function setTheme(theme: 'dark' | 'light') {
+  localStorage.setItem('shiplog-theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
+}
+
 function generateId() {
   return Math.random().toString(36).substring(2, 9);
 }
@@ -77,7 +88,7 @@ interface VersionDiff {
   modified: { release: string; oldVersion: string; newVersion: string }[];
 }
 
-function compareVersions(older: VersionSnapshot, newer: VersionSnapshot): VersionDiff {
+function diffVersions(older: VersionSnapshot, newer: VersionSnapshot): VersionDiff {
   const diff: VersionDiff = { added: [], removed: [], modified: [] };
   
   // Create maps for easier comparison
@@ -241,6 +252,7 @@ export default function Home() {
   const [compareMode, setCompareMode] = useState(false);
   const [compareVersions, setCompareVersions] = useState<[VersionSnapshot | null, VersionSnapshot | null]>([null, null]);
   const [versionDiff, setVersionDiff] = useState<VersionDiff | null>(null);
+  const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
 
   // Load saved releases and version history on mount
   useEffect(() => {
@@ -257,7 +269,18 @@ export default function Home() {
       setLastSaved(savedTime);
     }
     setVersionHistory(getVersionHistory());
+    
+    // Initialize theme
+    const savedTheme = getTheme();
+    setThemeState(savedTheme);
+    document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
+
+  const toggleTheme = useCallback(() => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setThemeState(newTheme);
+    setTheme(newTheme);
+  }, [theme]);
 
   // Auto-save when releases change (debounced)
   useEffect(() => {
@@ -318,7 +341,7 @@ export default function Home() {
         // Compute diff
         const older = new Date(prev[0].createdAt) < new Date(version.createdAt) ? prev[0] : version;
         const newer = older === prev[0] ? version : prev[0];
-        setVersionDiff(compareVersions(older, newer));
+        setVersionDiff(diffVersions(older, newer));
         return [prev[0], version];
       }
       // Reset and start new selection
@@ -502,6 +525,13 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-all"
             >
               💾 Save Version
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-all"
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
             </button>
           </div>
             
