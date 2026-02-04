@@ -253,6 +253,59 @@ export default function Home() {
   const [compareVersions, setCompareVersions] = useState<[VersionSnapshot | null, VersionSnapshot | null]>([null, null]);
   const [versionDiff, setVersionDiff] = useState<VersionDiff | null>(null);
   const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
+  
+  // Undo/Redo state
+  const [undoStack, setUndoStack] = useState<Release[][]>([]);
+  const [redoStack, setRedoStack] = useState<Release[][]>([]);
+
+  // Wrap setReleases to track undo/redo
+  const updateReleases = useCallback((updater: Release[] | ((prev: Release[]) => Release[])) => {
+    setReleases(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // Only add to undo stack if there's an actual change
+      if (JSON.stringify(prev) !== JSON.stringify(next)) {
+        setUndoStack(stack => [...stack.slice(-19), prev]); // Keep last 20 states
+        setRedoStack([]); // Clear redo stack on new change
+      }
+      return next;
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    const previous = undoStack[undoStack.length - 1];
+    setUndoStack(stack => stack.slice(0, -1));
+    setRedoStack(stack => [...stack, releases]);
+    setReleases(previous);
+  }, [undoStack, releases]);
+
+  const redo = useCallback(() => {
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    setRedoStack(stack => stack.slice(0, -1));
+    setUndoStack(stack => [...stack, releases]);
+    setReleases(next);
+  }, [redoStack, releases]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   // Load saved releases and version history on mount
   useEffect(() => {
@@ -380,47 +433,47 @@ export default function Home() {
   const addRelease = useCallback(() => {
     const lastVersion = releases[0]?.version || '0.0.0';
     const [major, minor, patch] = lastVersion.split('.').map(Number);
-    setReleases(prev => [{
+    updateReleases(prev => [{
       version: `${major}.${minor}.${patch + 1}`,
       date: new Date().toISOString().split('T')[0],
       changes: []
     }, ...prev]);
-  }, [releases]);
+  }, [releases, updateReleases]);
 
   const updateRelease = useCallback((index: number, updates: Partial<Release>) => {
-    setReleases(prev => prev.map((r, i) => i === index ? { ...r, ...updates } : r));
-  }, []);
+    updateReleases(prev => prev.map((r, i) => i === index ? { ...r, ...updates } : r));
+  }, [updateReleases]);
 
   const deleteRelease = useCallback((index: number) => {
-    setReleases(prev => prev.filter((_, i) => i !== index));
-  }, []);
+    updateReleases(prev => prev.filter((_, i) => i !== index));
+  }, [updateReleases]);
 
   const addChange = useCallback((releaseIndex: number, type: ChangeType) => {
-    setReleases(prev => prev.map((r, i) => {
+    updateReleases(prev => prev.map((r, i) => {
       if (i !== releaseIndex) return r;
       return {
         ...r,
         changes: [...r.changes, { id: generateId(), type, description: '' }]
       };
     }));
-  }, []);
+  }, [updateReleases]);
 
   const updateChange = useCallback((releaseIndex: number, changeId: string, description: string) => {
-    setReleases(prev => prev.map((r, i) => {
+    updateReleases(prev => prev.map((r, i) => {
       if (i !== releaseIndex) return r;
       return {
         ...r,
         changes: r.changes.map(c => c.id === changeId ? { ...c, description } : c)
       };
     }));
-  }, []);
+  }, [updateReleases]);
 
   const deleteChange = useCallback((releaseIndex: number, changeId: string) => {
-    setReleases(prev => prev.map((r, i) => {
+    updateReleases(prev => prev.map((r, i) => {
       if (i !== releaseIndex) return r;
       return { ...r, changes: r.changes.filter(c => c.id !== changeId) };
     }));
-  }, []);
+  }, [updateReleases]);
 
   const getExport = useCallback(() => {
     const filtered = releases.map(r => ({
@@ -776,6 +829,29 @@ export default function Home() {
                   </svg>
                   New Release
                 </button>
+                {/* Undo/Redo Buttons */}
+                <div className="flex gap-1 ml-2">
+                  <button
+                    onClick={undo}
+                    disabled={undoStack.length === 0}
+                    className="p-2 rounded-lg text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white"
+                    title="Undo (Ctrl+Z)"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={redo}
+                    disabled={redoStack.length === 0}
+                    className="p-2 rounded-lg text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white"
+                    title="Redo (Ctrl+Shift+Z)"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
