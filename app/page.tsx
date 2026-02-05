@@ -254,6 +254,10 @@ export default function Home() {
   const [versionDiff, setVersionDiff] = useState<VersionDiff | null>(null);
   const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
   
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchBar, setShowSearchBar] = useState(false);
+
   // Undo/Redo state
   const [undoStack, setUndoStack] = useState<Release[][]>([]);
   const [redoStack, setRedoStack] = useState<Release[][]>([]);
@@ -287,7 +291,7 @@ export default function Home() {
     setReleases(next);
   }, [redoStack, releases]);
 
-  // Keyboard shortcuts for undo/redo
+  // Keyboard shortcuts for undo/redo and search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
@@ -302,10 +306,15 @@ export default function Home() {
         e.preventDefault();
         redo();
       }
+      // Escape closes search
+      if (e.key === 'Escape' && showSearchBar) {
+        setShowSearchBar(false);
+        setSearchQuery('');
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, showSearchBar]);
 
   // Load saved releases and version history on mount
   useEffect(() => {
@@ -586,6 +595,16 @@ export default function Home() {
             >
               {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
             </button>
+            <button
+              onClick={() => { setShowSearchBar(!showSearchBar); if (showSearchBar) setSearchQuery(''); }}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                showSearchBar
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              🔍 Search
+            </button>
           </div>
             
             {showTemplates && (
@@ -805,6 +824,49 @@ export default function Home() {
           </div>
         )}
 
+        {/* Search Bar */}
+        {showSearchBar && (
+          <div className="mb-6 fade-in">
+            <div className="relative max-w-xl mx-auto">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search changes... (e.g. fixed, authentication, API)"
+                className="w-full px-4 py-3 pl-10 bg-zinc-900 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/25 transition-all"
+                autoFocus
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">🔍</span>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {searchQuery.trim() && (() => {
+              const q = searchQuery.toLowerCase().trim();
+              const matchCount = releases.reduce((count, r) => {
+                return count + r.changes.filter(c => c.description.toLowerCase().includes(q) || c.type.toLowerCase().includes(q)).length;
+              }, 0);
+              const versionMatch = releases.some(r => r.version.toLowerCase().includes(q));
+              return (
+                <p className="text-center text-xs text-zinc-500 mt-2">
+                  {matchCount > 0 ? (
+                    <span className="text-emerald-400">{matchCount} matching change{matchCount !== 1 ? 's' : ''} found</span>
+                  ) : versionMatch ? (
+                    <span className="text-emerald-400">Version match found</span>
+                  ) : (
+                    <span>No matches for "{searchQuery}"</span>
+                  )}
+                </p>
+              );
+            })()}
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Editor Panel */}
           <div className="space-y-4">
@@ -856,10 +918,18 @@ export default function Home() {
             </div>
 
             <div className="space-y-4">
-              {releases.map((release, releaseIndex) => (
+              {releases.map((release, releaseIndex) => {
+                const q = searchQuery.toLowerCase().trim();
+                const releaseHasMatch = q ? (
+                  release.version.toLowerCase().includes(q) ||
+                  release.changes.some(c => c.description.toLowerCase().includes(q) || c.type.toLowerCase().includes(q))
+                ) : true;
+                const isDimmed = q && !releaseHasMatch;
+                
+                return (
                 <div 
                   key={releaseIndex} 
-                  className="release-card rounded-2xl p-5 fade-in"
+                  className={`release-card rounded-2xl p-5 fade-in transition-opacity ${isDimmed ? 'opacity-30' : ''}`}
                 >
                   {/* Version & Date */}
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
@@ -915,10 +985,12 @@ export default function Home() {
 
                   {/* Changes List */}
                   <div className="space-y-2">
-                    {release.changes.map(change => (
+                    {release.changes.map(change => {
+                      const changeMatches = q && (change.description.toLowerCase().includes(q) || change.type.toLowerCase().includes(q));
+                      return (
                       <div 
                         key={change.id} 
-                        className="group flex gap-2 items-start fade-in"
+                        className={`group flex gap-2 items-start fade-in transition-all ${changeMatches ? 'ring-1 ring-emerald-500/40 rounded-lg bg-emerald-500/5 p-1 -m-1' : ''}`}
                       >
                         <span className={`${badgeClass(change.type)} px-2 py-1 rounded text-xs flex-shrink-0 mt-1`}>
                           {changeTypeConfig[change.type].emoji}
@@ -940,7 +1012,8 @@ export default function Home() {
                           </svg>
                         </button>
                       </div>
-                    ))}
+                    );
+                    })}
                     
                     {release.changes.length === 0 && (
                       <p className="text-zinc-600 text-sm text-center py-4">
@@ -949,7 +1022,8 @@ export default function Home() {
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
 
