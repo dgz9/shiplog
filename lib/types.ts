@@ -21,6 +21,125 @@ export const changeTypeConfig: Record<ChangeType, { label: string; emoji: string
   deprecated: { label: 'Deprecated', emoji: '⚠️', color: 'bg-orange-500' },
 };
 
+// Helper to generate unique IDs
+function generateId(): string {
+  return Math.random().toString(36).substring(2, 9);
+}
+
+// Parse raw changelog text into structured releases
+export function parseChangelogText(text: string): Release[] {
+  const releases: Release[] = [];
+  const lines = text.split('\n');
+  
+  let currentRelease: Release | null = null;
+  let currentType: ChangeType = 'added';
+  
+  // Patterns to detect version headers
+  const versionPatterns = [
+    /^##?\s*\[?v?(\d+\.\d+(?:\.\d+)?)\]?\s*[-–—]?\s*(.+)?$/i,  // ## [1.0.0] - 2024-01-01
+    /^v?(\d+\.\d+(?:\.\d+)?)\s*[-–—]?\s*(.+)?$/i,               // 1.0.0 - 2024-01-01
+    /^version\s*:?\s*v?(\d+\.\d+(?:\.\d+)?)\s*[-–—]?\s*(.+)?$/i // Version: 1.0.0
+  ];
+  
+  // Patterns to detect section headers
+  const sectionPatterns: { pattern: RegExp; type: ChangeType }[] = [
+    { pattern: /^###?\s*(added|new|features?)/i, type: 'added' },
+    { pattern: /^###?\s*(changed|updated?|modified)/i, type: 'changed' },
+    { pattern: /^###?\s*(fixed|bug\s*fix|fixes)/i, type: 'fixed' },
+    { pattern: /^###?\s*(removed|deleted)/i, type: 'removed' },
+    { pattern: /^###?\s*(security)/i, type: 'security' },
+    { pattern: /^###?\s*(deprecated)/i, type: 'deprecated' },
+  ];
+  
+  // Pattern for list items
+  const listItemPattern = /^[-*•]\s*(.+)$/;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    
+    // Check for version header
+    let versionMatch = null;
+    for (const pattern of versionPatterns) {
+      versionMatch = trimmed.match(pattern);
+      if (versionMatch) break;
+    }
+    
+    if (versionMatch) {
+      // Save previous release
+      if (currentRelease && currentRelease.changes.length > 0) {
+        releases.push(currentRelease);
+      }
+      
+      // Extract date from the rest of the line if present
+      let date = new Date().toISOString().split('T')[0];
+      const dateRest = versionMatch[2] || '';
+      const dateMatch = dateRest.match(/(\d{4}[-/]\d{1,2}[-/]\d{1,2})/);
+      if (dateMatch) {
+        date = dateMatch[1].replace(/\//g, '-');
+      }
+      
+      currentRelease = {
+        version: versionMatch[1],
+        date,
+        changes: []
+      };
+      currentType = 'added'; // Reset to default type
+      continue;
+    }
+    
+    // Check for section header
+    let sectionMatch = null;
+    for (const { pattern, type } of sectionPatterns) {
+      if (pattern.test(trimmed)) {
+        sectionMatch = type;
+        break;
+      }
+    }
+    
+    if (sectionMatch) {
+      currentType = sectionMatch;
+      continue;
+    }
+    
+    // Check for list item
+    const itemMatch = trimmed.match(listItemPattern);
+    if (itemMatch && currentRelease) {
+      // Auto-detect type from keywords if in default mode
+      let detectedType = currentType;
+      const description = itemMatch[1].trim();
+      const lowerDesc = description.toLowerCase();
+      
+      if (lowerDesc.startsWith('fix') || lowerDesc.startsWith('bug')) {
+        detectedType = 'fixed';
+      } else if (lowerDesc.startsWith('add') || lowerDesc.startsWith('new ')) {
+        detectedType = 'added';
+      } else if (lowerDesc.startsWith('remove') || lowerDesc.startsWith('delete')) {
+        detectedType = 'removed';
+      } else if (lowerDesc.startsWith('security') || lowerDesc.includes('vulnerability') || lowerDesc.includes('cve')) {
+        detectedType = 'security';
+      } else if (lowerDesc.startsWith('deprecat')) {
+        detectedType = 'deprecated';
+      } else if (lowerDesc.startsWith('update') || lowerDesc.startsWith('change') || lowerDesc.startsWith('improve')) {
+        detectedType = 'changed';
+      }
+      
+      currentRelease.changes.push({
+        id: generateId(),
+        type: detectedType,
+        description
+      });
+    }
+  }
+  
+  // Don't forget the last release
+  if (currentRelease && currentRelease.changes.length > 0) {
+    releases.push(currentRelease);
+  }
+  
+  return releases;
+}
+
 export function generateMarkdown(releases: Release[]): string {
   let md = '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
   

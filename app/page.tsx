@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { 
   type Release, 
   type ChangeItem, 
@@ -8,7 +8,8 @@ import {
   changeTypeConfig,
   generateMarkdown,
   generateJSON,
-  generateHTML
+  generateHTML,
+  parseChangelogText
 } from '@/lib/types';
 
 // Theme helpers
@@ -253,10 +254,46 @@ export default function Home() {
   const [compareVersions, setCompareVersions] = useState<[VersionSnapshot | null, VersionSnapshot | null]>([null, null]);
   const [versionDiff, setVersionDiff] = useState<VersionDiff | null>(null);
   const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
+  const [showStats, setShowStats] = useState(false);
+
+  // Calculate statistics from releases
+  const stats = useMemo(() => {
+    const counts: Record<ChangeType, number> = {
+      added: 0,
+      changed: 0,
+      fixed: 0,
+      removed: 0,
+      security: 0,
+      deprecated: 0,
+    };
+    let totalChanges = 0;
+    const releasesByMonth: Record<string, number> = {};
+    
+    releases.forEach(release => {
+      // Count by month
+      const month = release.date.substring(0, 7); // YYYY-MM
+      releasesByMonth[month] = (releasesByMonth[month] || 0) + 1;
+      
+      // Count by type
+      release.changes.forEach(change => {
+        if (change.description.trim()) {
+          counts[change.type]++;
+          totalChanges++;
+        }
+      });
+    });
+    
+    return { counts, totalChanges, releaseCount: releases.length, releasesByMonth };
+  }, [releases]);
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
+
+  // Import from text state
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importPreview, setImportPreview] = useState<Release[]>([]);
 
   // Undo/Redo state
   const [undoStack, setUndoStack] = useState<Release[][]>([]);
@@ -439,6 +476,27 @@ export default function Home() {
     setLastSaved(null);
   }, []);
 
+  // Handle import text change - parse preview
+  const handleImportTextChange = useCallback((text: string) => {
+    setImportText(text);
+    if (text.trim()) {
+      const parsed = parseChangelogText(text);
+      setImportPreview(parsed);
+    } else {
+      setImportPreview([]);
+    }
+  }, []);
+
+  // Apply import
+  const applyImport = useCallback(() => {
+    if (importPreview.length > 0) {
+      updateReleases(importPreview);
+      setShowImport(false);
+      setImportText('');
+      setImportPreview([]);
+    }
+  }, [importPreview, updateReleases]);
+
   const addRelease = useCallback(() => {
     const lastVersion = releases[0]?.version || '0.0.0';
     const [major, minor, patch] = lastVersion.split('.').map(Number);
@@ -589,6 +647,16 @@ export default function Home() {
               💾 Save Version
             </button>
             <button
+              onClick={() => setShowStats(!showStats)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                showStats
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              📊 Stats
+            </button>
+            <button
               onClick={toggleTheme}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-all"
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
@@ -604,6 +672,16 @@ export default function Home() {
               }`}
             >
               🔍 Search
+            </button>
+            <button
+              onClick={() => setShowImport(!showImport)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                showImport
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              📥 Import
             </button>
           </div>
             
@@ -773,6 +851,110 @@ export default function Home() {
               </div>
             )}
         </div>
+
+        {/* Import from Text Panel */}
+        {showImport && (
+          <div className="mb-6 fade-in max-w-4xl mx-auto">
+            <div className="bg-zinc-900/80 border border-cyan-500/30 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <span>📥</span> Import from Text
+                </h3>
+                <button
+                  onClick={() => { setShowImport(false); setImportText(''); setImportPreview([]); }}
+                  className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <p className="text-zinc-400 text-sm mb-4">
+                Paste your changelog text below. Supports Markdown format, bullet lists, and auto-detects change types from keywords.
+              </p>
+              
+              <div className="grid lg:grid-cols-2 gap-4">
+                {/* Input */}
+                <div>
+                  <label className="text-xs text-zinc-500 mb-2 block">Raw Changelog Text</label>
+                  <textarea
+                    value={importText}
+                    onChange={(e) => handleImportTextChange(e.target.value)}
+                    placeholder={`## 1.0.0 - 2024-01-15
+
+### Added
+- New feature for users
+- Added dark mode support
+
+### Fixed
+- Fixed login bug
+- Bug fix for mobile layout
+
+### Changed
+- Updated dependencies
+- Improved performance`}
+                    className="w-full h-64 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-sm font-mono focus:outline-none focus:border-cyan-500 resize-y"
+                  />
+                </div>
+                
+                {/* Preview */}
+                <div>
+                  <label className="text-xs text-zinc-500 mb-2 block">
+                    Preview ({importPreview.length} release{importPreview.length !== 1 ? 's' : ''} detected)
+                  </label>
+                  <div className="h-64 bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 overflow-y-auto">
+                    {importPreview.length === 0 ? (
+                      <p className="text-zinc-600 text-sm">Paste text to see preview...</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {importPreview.map((release, i) => (
+                          <div key={i} className="bg-zinc-800 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-emerald-400 font-semibold">v{release.version}</span>
+                              <span className="text-zinc-500 text-xs">{release.date}</span>
+                            </div>
+                            <div className="space-y-1">
+                              {release.changes.map((change) => (
+                                <div key={change.id} className="flex items-center gap-2 text-xs">
+                                  <span className={`px-1.5 py-0.5 rounded ${
+                                    change.type === 'added' ? 'bg-green-500/20 text-green-400' :
+                                    change.type === 'fixed' ? 'bg-yellow-500/20 text-yellow-400' :
+                                    change.type === 'changed' ? 'bg-blue-500/20 text-blue-400' :
+                                    change.type === 'removed' ? 'bg-red-500/20 text-red-400' :
+                                    change.type === 'security' ? 'bg-purple-500/20 text-purple-400' :
+                                    'bg-orange-500/20 text-orange-400'
+                                  }`}>
+                                    {changeTypeConfig[change.type].emoji}
+                                  </span>
+                                  <span className="text-zinc-300 truncate">{change.description}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() => { setShowImport(false); setImportText(''); setImportPreview([]); }}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 text-sm font-medium transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={applyImport}
+                  disabled={importPreview.length === 0}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white text-sm font-medium transition-all"
+                >
+                  Import {importPreview.length > 0 && `(${importPreview.length} releases)`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Restore Prompt */}
         {showRestorePrompt && (
