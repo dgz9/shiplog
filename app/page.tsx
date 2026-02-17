@@ -289,6 +289,7 @@ export default function Home() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   // Import from text state
   const [showImport, setShowImport] = useState(false);
@@ -674,14 +675,14 @@ export default function Home() {
               🔍 Search
             </button>
             <button
-              onClick={() => setShowImport(!showImport)}
+              onClick={() => setShowStats(!showStats)}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                showImport
-                  ? 'bg-cyan-600 text-white'
+                showStats
+                  ? 'bg-orange-600 text-white'
                   : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
               }`}
             >
-              📥 Import
+              📊 Stats
             </button>
           </div>
             
@@ -1048,6 +1049,65 @@ export default function Home() {
             })()}
           </div>
         )}
+
+        {/* Stats Dashboard */}
+        {showStats && (() => {
+          const allChanges = releases.flatMap(r => r.changes.filter(c => c.description.trim()));
+          const totalChanges = allChanges.length;
+          const byType: Record<string, number> = {};
+          allChanges.forEach(c => { byType[c.type] = (byType[c.type] || 0) + 1; });
+          const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0];
+          const totalReleases = releases.length;
+          const avgPerRelease = totalReleases > 0 ? (totalChanges / totalReleases).toFixed(1) : '0';
+          
+          return (
+            <div className="mb-6 fade-in">
+              <div className="max-w-2xl mx-auto bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <span>📊</span> Changelog Stats
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                  <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-emerald-400">{totalReleases}</div>
+                    <div className="text-xs text-zinc-500">Releases</div>
+                  </div>
+                  <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-400">{totalChanges}</div>
+                    <div className="text-xs text-zinc-500">Total Changes</div>
+                  </div>
+                  <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-purple-400">{avgPerRelease}</div>
+                    <div className="text-xs text-zinc-500">Avg / Release</div>
+                  </div>
+                  <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-orange-400">{topType ? changeTypeConfig[topType[0] as ChangeType]?.emoji || '—' : '—'}</div>
+                    <div className="text-xs text-zinc-500">{topType ? `Most: ${topType[0]}` : 'No data'}</div>
+                  </div>
+                </div>
+                {totalChanges > 0 && (
+                  <div className="space-y-2">
+                    {(Object.keys(changeTypeConfig) as ChangeType[]).map(type => {
+                      const count = byType[type] || 0;
+                      if (count === 0) return null;
+                      const pct = Math.round((count / totalChanges) * 100);
+                      return (
+                        <div key={type} className="flex items-center gap-3">
+                          <span className="text-sm w-24 flex items-center gap-1.5">
+                            {changeTypeConfig[type].emoji} {changeTypeConfig[type].label}
+                          </span>
+                          <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500/60 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-zinc-500 w-12 text-right">{count} ({pct}%)</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Editor Panel */}
