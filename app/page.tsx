@@ -289,7 +289,6 @@ export default function Home() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
-  const [showStats, setShowStats] = useState(false);
 
   // Import from text state
   const [showImport, setShowImport] = useState(false);
@@ -675,14 +674,14 @@ export default function Home() {
               🔍 Search
             </button>
             <button
-              onClick={() => setShowStats(!showStats)}
+              onClick={() => { setShowImport(!showImport); }}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                showStats
-                  ? 'bg-orange-600 text-white'
+                showImport
+                  ? 'bg-cyan-600 text-white'
                   : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
               }`}
             >
-              📊 Stats
+              📥 Import
             </button>
           </div>
             
