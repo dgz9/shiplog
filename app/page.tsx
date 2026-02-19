@@ -542,6 +542,19 @@ export default function Home() {
     }));
   }, [updateReleases]);
 
+  const moveChange = useCallback((releaseIndex: number, fromIdx: number, toIdx: number) => {
+    updateReleases(prev => prev.map((r, i) => {
+      if (i !== releaseIndex) return r;
+      const changes = [...r.changes];
+      const [moved] = changes.splice(fromIdx, 1);
+      changes.splice(toIdx, 0, moved);
+      return { ...r, changes };
+    }));
+  }, [updateReleases]);
+
+  // Drag state for reordering
+  const [dragState, setDragState] = useState<{ releaseIndex: number; changeIndex: number } | null>(null);
+
   const getExport = useCallback(() => {
     const filtered = releases.map(r => ({
       ...r,
@@ -1226,13 +1239,27 @@ export default function Home() {
 
                   {/* Changes List */}
                   <div className="space-y-2">
-                    {release.changes.map(change => {
+                    {release.changes.map((change, changeIdx) => {
                       const changeMatches = q && (change.description.toLowerCase().includes(q) || change.type.toLowerCase().includes(q));
                       return (
                       <div 
-                        key={change.id} 
-                        className={`group flex gap-2 items-start fade-in transition-all ${changeMatches ? 'ring-1 ring-emerald-500/40 rounded-lg bg-emerald-500/5 p-1 -m-1' : ''}`}
+                        key={change.id}
+                        draggable
+                        onDragStart={() => setDragState({ releaseIndex, changeIndex: changeIdx })}
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (dragState && dragState.releaseIndex === releaseIndex && dragState.changeIndex !== changeIdx) {
+                            moveChange(releaseIndex, dragState.changeIndex, changeIdx);
+                          }
+                          setDragState(null);
+                        }}
+                        onDragEnd={() => setDragState(null)}
+                        className={`group flex gap-2 items-start fade-in transition-all cursor-grab active:cursor-grabbing ${changeMatches ? 'ring-1 ring-emerald-500/40 rounded-lg bg-emerald-500/5 p-1 -m-1' : ''} ${
+                          dragState?.releaseIndex === releaseIndex && dragState?.changeIndex === changeIdx ? 'opacity-40' : ''
+                        }`}
                       >
+                        <span className="text-zinc-600 mt-2 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity text-xs">⠿</span>
                         <span className={`${badgeClass(change.type)} px-2 py-1 rounded text-xs flex-shrink-0 mt-1`}>
                           {changeTypeConfig[change.type].emoji}
                         </span>
