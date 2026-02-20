@@ -9,6 +9,7 @@ import {
   generateMarkdown,
   generateJSON,
   generateHTML,
+  generateYAML,
   parseChangelogText
 } from '@/lib/types';
 
@@ -240,7 +241,7 @@ export default function Home() {
       changes: []
     }
   ]);
-  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html'>('markdown');
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html' | 'yaml'>('markdown');
   const [copied, setCopied] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -563,6 +564,7 @@ export default function Home() {
     
     if (exportFormat === 'markdown') return generateMarkdown(filtered);
     if (exportFormat === 'json') return generateJSON(filtered);
+    if (exportFormat === 'yaml') return generateYAML(filtered);
     return generateHTML(filtered);
   }, [releases, exportFormat]);
 
@@ -574,8 +576,8 @@ export default function Home() {
 
   const downloadFile = useCallback(() => {
     const content = getExport();
-    const filenames = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html' };
-    const mimeTypes = { markdown: 'text/markdown', json: 'application/json', html: 'text/html' };
+    const filenames: Record<string, string> = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html', yaml: 'changelog.yaml' };
+    const mimeTypes: Record<string, string> = { markdown: 'text/markdown', json: 'application/json', html: 'text/html', yaml: 'text/yaml' };
     
     const blob = new Blob([content], { type: mimeTypes[exportFormat] });
     const url = URL.createObjectURL(blob);
@@ -1330,6 +1332,16 @@ export default function Home() {
                     }`}
                   >
                     HTML
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('yaml')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      exportFormat === 'yaml'
+                        ? 'bg-zinc-800 text-white'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    YAML
                   </button>
                 </div>
                 <button

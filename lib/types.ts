@@ -173,6 +173,32 @@ export function generateJSON(releases: Release[]): string {
   return JSON.stringify({ releases }, null, 2);
 }
 
+export function generateYAML(releases: Release[]): string {
+  let yaml = 'changelog:\n';
+  for (const release of releases) {
+    yaml += `  - version: "${release.version}"\n`;
+    yaml += `    date: "${release.date}"\n`;
+    yaml += `    changes:\n`;
+    
+    const grouped: Record<ChangeType, ChangeItem[]> = {
+      added: [], changed: [], fixed: [], removed: [], security: [], deprecated: []
+    };
+    for (const change of release.changes) {
+      grouped[change.type].push(change);
+    }
+    
+    for (const [type, items] of Object.entries(grouped)) {
+      if (items.length > 0) {
+        yaml += `      ${type}:\n`;
+        for (const item of items) {
+          yaml += `        - "${item.description.replace(/"/g, '\\"')}"\n`;
+        }
+      }
+    }
+  }
+  return yaml;
+}
+
 export function generateHTML(releases: Release[]): string {
   const typeColors: Record<ChangeType, string> = {
     added: '#22c55e',
