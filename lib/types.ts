@@ -199,6 +199,32 @@ export function generateYAML(releases: Release[]): string {
   return yaml;
 }
 
+export function generateTOML(releases: Release[]): string {
+  let toml = '# Changelog\n\n';
+  for (const release of releases) {
+    toml += `[[releases]]\n`;
+    toml += `version = "${release.version}"\n`;
+    toml += `date = "${release.date}"\n\n`;
+    
+    const grouped: Partial<Record<ChangeType, string[]>> = {};
+    for (const change of release.changes) {
+      if (!change.description.trim()) continue;
+      if (!grouped[change.type]) grouped[change.type] = [];
+      grouped[change.type]!.push(change.description);
+    }
+    
+    for (const [type, items] of Object.entries(grouped)) {
+      toml += `[releases.${type}]\n`;
+      toml += `items = [\n`;
+      for (const item of items as string[]) {
+        toml += `  "${item.replace(/"/g, '\\"')}",\n`;
+      }
+      toml += `]\n\n`;
+    }
+  }
+  return toml;
+}
+
 export function generateHTML(releases: Release[]): string {
   const typeColors: Record<ChangeType, string> = {
     added: '#22c55e',

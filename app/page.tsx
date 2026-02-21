@@ -10,6 +10,7 @@ import {
   generateJSON,
   generateHTML,
   generateYAML,
+  generateTOML,
   parseChangelogText
 } from '@/lib/types';
 
@@ -241,7 +242,7 @@ export default function Home() {
       changes: []
     }
   ]);
-  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html' | 'yaml'>('markdown');
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html' | 'yaml' | 'toml'>('markdown');
   const [copied, setCopied] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -565,6 +566,7 @@ export default function Home() {
     if (exportFormat === 'markdown') return generateMarkdown(filtered);
     if (exportFormat === 'json') return generateJSON(filtered);
     if (exportFormat === 'yaml') return generateYAML(filtered);
+    if (exportFormat === 'toml') return generateTOML(filtered);
     return generateHTML(filtered);
   }, [releases, exportFormat]);
 
@@ -576,8 +578,8 @@ export default function Home() {
 
   const downloadFile = useCallback(() => {
     const content = getExport();
-    const filenames: Record<string, string> = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html', yaml: 'changelog.yaml' };
-    const mimeTypes: Record<string, string> = { markdown: 'text/markdown', json: 'application/json', html: 'text/html', yaml: 'text/yaml' };
+    const filenames: Record<string, string> = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html', yaml: 'changelog.yaml', toml: 'changelog.toml' };
+    const mimeTypes: Record<string, string> = { markdown: 'text/markdown', json: 'application/json', html: 'text/html', yaml: 'text/yaml', toml: 'application/toml' };
     
     const blob = new Blob([content], { type: mimeTypes[exportFormat] });
     const url = URL.createObjectURL(blob);
@@ -1342,6 +1344,16 @@ export default function Home() {
                     }`}
                   >
                     YAML
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('toml')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      exportFormat === 'toml'
+                        ? 'bg-zinc-800 text-white'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    TOML
                   </button>
                 </div>
                 <button
