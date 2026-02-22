@@ -225,6 +225,56 @@ export function generateTOML(releases: Release[]): string {
   return toml;
 }
 
+export function generateRSS(releases: Release[]): string {
+  const now = new Date().toUTCString();
+  let rss = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Changelog</title>
+    <description>Project changelog and release notes</description>
+    <link>https://example.com</link>
+    <lastBuildDate>${now}</lastBuildDate>
+    <generator>ShipLog</generator>
+`;
+
+  for (const release of releases) {
+    const grouped: Record<ChangeType, ChangeItem[]> = {
+      added: [], changed: [], fixed: [], removed: [], security: [], deprecated: []
+    };
+    for (const change of release.changes) {
+      grouped[change.type].push(change);
+    }
+
+    let description = '';
+    for (const [type, items] of Object.entries(grouped)) {
+      if (items.length > 0) {
+        const config = changeTypeConfig[type as ChangeType];
+        description += `<h3>${config.emoji} ${config.label}</h3><ul>`;
+        for (const item of items) {
+          description += `<li>${escapeXml(item.description)}</li>`;
+        }
+        description += '</ul>';
+      }
+    }
+
+    rss += `    <item>
+      <title>v${escapeXml(release.version)}</title>
+      <pubDate>${new Date(release.date).toUTCString()}</pubDate>
+      <description><![CDATA[${description}]]></description>
+      <guid>release-${escapeXml(release.version)}</guid>
+    </item>
+`;
+  }
+
+  rss += `  </channel>
+</rss>`;
+  return rss;
+}
+
+function escapeXml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export function generateHTML(releases: Release[]): string {
   const typeColors: Record<ChangeType, string> = {
     added: '#22c55e',

@@ -11,6 +11,7 @@ import {
   generateHTML,
   generateYAML,
   generateTOML,
+  generateRSS,
   parseChangelogText
 } from '@/lib/types';
 
@@ -242,7 +243,7 @@ export default function Home() {
       changes: []
     }
   ]);
-  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html' | 'yaml' | 'toml'>('markdown');
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html' | 'yaml' | 'toml' | 'rss'>('markdown');
   const [copied, setCopied] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -567,6 +568,7 @@ export default function Home() {
     if (exportFormat === 'json') return generateJSON(filtered);
     if (exportFormat === 'yaml') return generateYAML(filtered);
     if (exportFormat === 'toml') return generateTOML(filtered);
+    if (exportFormat === 'rss') return generateRSS(filtered);
     return generateHTML(filtered);
   }, [releases, exportFormat]);
 
@@ -578,8 +580,8 @@ export default function Home() {
 
   const downloadFile = useCallback(() => {
     const content = getExport();
-    const filenames: Record<string, string> = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html', yaml: 'changelog.yaml', toml: 'changelog.toml' };
-    const mimeTypes: Record<string, string> = { markdown: 'text/markdown', json: 'application/json', html: 'text/html', yaml: 'text/yaml', toml: 'application/toml' };
+    const filenames: Record<string, string> = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html', yaml: 'changelog.yaml', toml: 'changelog.toml', rss: 'changelog.xml' };
+    const mimeTypes: Record<string, string> = { markdown: 'text/markdown', json: 'application/json', html: 'text/html', yaml: 'text/yaml', toml: 'application/toml', rss: 'application/rss+xml' };
     
     const blob = new Blob([content], { type: mimeTypes[exportFormat] });
     const url = URL.createObjectURL(blob);
@@ -1354,6 +1356,16 @@ export default function Home() {
                     }`}
                   >
                     TOML
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('rss')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      exportFormat === 'rss'
+                        ? 'bg-zinc-800 text-white'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    RSS
                   </button>
                 </div>
                 <button
