@@ -356,3 +356,33 @@ export function generateHTML(releases: Release[]): string {
 
   return html;
 }
+
+// Generate Conventional Commits format
+const typeToConventional: Record<ChangeType, string> = {
+  added: 'feat',
+  changed: 'refactor',
+  fixed: 'fix',
+  removed: 'refactor',
+  security: 'fix',
+  deprecated: 'refactor',
+};
+
+export function generateConventionalCommits(releases: Release[]): string {
+  const lines: string[] = [];
+  lines.push('# Conventional Commits');
+  lines.push('# Copy these as git commit messages\n');
+
+  for (const release of releases) {
+    lines.push(`# --- v${release.version} (${release.date}) ---`);
+    for (const change of release.changes) {
+      if (!change.description.trim()) continue;
+      const prefix = typeToConventional[change.type];
+      const scope = change.type === 'security' ? '(security)' : change.type === 'deprecated' ? '(deprecated)' : '';
+      const breaking = change.description.toLowerCase().startsWith('breaking') ? '!' : '';
+      lines.push(`${prefix}${scope}${breaking}: ${change.description}`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
