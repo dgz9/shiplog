@@ -357,6 +357,76 @@ export function generateHTML(releases: Release[]): string {
   return html;
 }
 
+// Generate plain-English release summary (for announcements, emails, social)
+export function generatePlainSummary(releases: Release[]): string {
+  const lines: string[] = [];
+  
+  for (const release of releases) {
+    const changes = release.changes.filter(c => c.description.trim());
+    if (changes.length === 0) continue;
+    
+    lines.push(`🚀 Version ${release.version} (${release.date})`);
+    lines.push('');
+    
+    const added = changes.filter(c => c.type === 'added');
+    const fixed = changes.filter(c => c.type === 'fixed');
+    const changed = changes.filter(c => c.type === 'changed');
+    const security = changes.filter(c => c.type === 'security');
+    const removed = changes.filter(c => c.type === 'removed');
+    const deprecated = changes.filter(c => c.type === 'deprecated');
+    
+    if (added.length > 0) {
+      lines.push(`What's new:`);
+      added.forEach(c => lines.push(`  • ${c.description}`));
+      lines.push('');
+    }
+    if (fixed.length > 0) {
+      lines.push(`Bug fixes:`);
+      fixed.forEach(c => lines.push(`  • ${c.description}`));
+      lines.push('');
+    }
+    if (changed.length > 0) {
+      lines.push(`Improvements:`);
+      changed.forEach(c => lines.push(`  • ${c.description}`));
+      lines.push('');
+    }
+    if (security.length > 0) {
+      lines.push(`🔒 Security:`);
+      security.forEach(c => lines.push(`  • ${c.description}`));
+      lines.push('');
+    }
+    if (removed.length > 0) {
+      lines.push(`Removed:`);
+      removed.forEach(c => lines.push(`  • ${c.description}`));
+      lines.push('');
+    }
+    if (deprecated.length > 0) {
+      lines.push(`⚠️ Deprecated:`);
+      deprecated.forEach(c => lines.push(`  • ${c.description}`));
+      lines.push('');
+    }
+    
+    // One-liner summary
+    const totalNew = added.length;
+    const totalFix = fixed.length;
+    const parts: string[] = [];
+    if (totalNew > 0) parts.push(`${totalNew} new feature${totalNew > 1 ? 's' : ''}`);
+    if (totalFix > 0) parts.push(`${totalFix} bug fix${totalFix > 1 ? 'es' : ''}`);
+    if (changed.length > 0) parts.push(`${changed.length} improvement${changed.length > 1 ? 's' : ''}`);
+    if (security.length > 0) parts.push(`${security.length} security patch${security.length > 1 ? 'es' : ''}`);
+    
+    if (parts.length > 0) {
+      lines.push(`TL;DR: ${parts.join(', ')}.`);
+      lines.push('');
+    }
+    
+    lines.push('---');
+    lines.push('');
+  }
+  
+  return lines.join('\n').trim();
+}
+
 // Generate Conventional Commits format
 const typeToConventional: Record<ChangeType, string> = {
   added: 'feat',

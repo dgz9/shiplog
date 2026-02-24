@@ -13,6 +13,7 @@ import {
   generateTOML,
   generateRSS,
   generateConventionalCommits,
+  generatePlainSummary,
   parseChangelogText
 } from '@/lib/types';
 
@@ -244,7 +245,7 @@ export default function Home() {
       changes: []
     }
   ]);
-  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html' | 'yaml' | 'toml' | 'rss' | 'commits'>('markdown');
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'html' | 'yaml' | 'toml' | 'rss' | 'commits' | 'summary'>('markdown');
   const [copied, setCopied] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -571,6 +572,7 @@ export default function Home() {
     if (exportFormat === 'toml') return generateTOML(filtered);
     if (exportFormat === 'rss') return generateRSS(filtered);
     if (exportFormat === 'commits') return generateConventionalCommits(filtered);
+    if (exportFormat === 'summary') return generatePlainSummary(filtered);
     return generateHTML(filtered);
   }, [releases, exportFormat]);
 
@@ -582,8 +584,8 @@ export default function Home() {
 
   const downloadFile = useCallback(() => {
     const content = getExport();
-    const filenames: Record<string, string> = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html', yaml: 'changelog.yaml', toml: 'changelog.toml', rss: 'changelog.xml', commits: 'commits.txt' };
-    const mimeTypes: Record<string, string> = { markdown: 'text/markdown', json: 'application/json', html: 'text/html', yaml: 'text/yaml', toml: 'application/toml', rss: 'application/rss+xml', commits: 'text/plain' };
+    const filenames: Record<string, string> = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html', yaml: 'changelog.yaml', toml: 'changelog.toml', rss: 'changelog.xml', commits: 'commits.txt', summary: 'release-notes.txt' };
+    const mimeTypes: Record<string, string> = { markdown: 'text/markdown', json: 'application/json', html: 'text/html', yaml: 'text/yaml', toml: 'application/toml', rss: 'application/rss+xml', commits: 'text/plain', summary: 'text/plain' };
     
     const blob = new Blob([content], { type: mimeTypes[exportFormat] });
     const url = URL.createObjectURL(blob);
@@ -1378,6 +1380,16 @@ export default function Home() {
                     }`}
                   >
                     Commits
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('summary')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      exportFormat === 'summary'
+                        ? 'bg-zinc-800 text-white'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    📣 Summary
                   </button>
                 </div>
                 <button
