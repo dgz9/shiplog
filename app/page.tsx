@@ -14,7 +14,9 @@ import {
   generateRSS,
   generateConventionalCommits,
   generatePlainSummary,
-  parseChangelogText
+  parseChangelogText,
+  suggestVersionBump,
+  applyBump
 } from '@/lib/types';
 
 // Theme helpers
@@ -1207,6 +1209,26 @@ export default function Home() {
                           placeholder="1.0.0"
                           className="input-field w-full rounded-lg px-3 py-2 text-white text-sm"
                         />
+                        {/* Smart version bump suggestion */}
+                        {release.changes.filter(c => c.description.trim()).length > 0 && (() => {
+                          const suggestion = suggestVersionBump(release.changes.filter(c => c.description.trim()));
+                          if (!suggestion) return null;
+                          const suggestedVersion = applyBump(release.version, suggestion.bump);
+                          if (suggestedVersion === release.version) return null;
+                          return (
+                            <button
+                              onClick={() => updateRelease(releaseIndex, { version: suggestedVersion })}
+                              className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all hover:scale-105 ${
+                                suggestion.bump === 'major' ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25' :
+                                suggestion.bump === 'minor' ? 'bg-blue-500/15 text-blue-400 hover:bg-blue-500/25' :
+                                'bg-green-500/15 text-green-400 hover:bg-green-500/25'
+                              }`}
+                              title={suggestion.reason}
+                            >
+                              💡 Suggest {suggestedVersion} ({suggestion.bump})
+                            </button>
+                          );
+                        })()}
                       </div>
                       <div className="flex-1">
                         <label className="text-xs text-zinc-500 mb-1 block">Date</label>

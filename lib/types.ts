@@ -437,6 +437,36 @@ const typeToConventional: Record<ChangeType, string> = {
   deprecated: 'refactor',
 };
 
+// Smart version bump suggestion based on change types
+export type BumpType = 'major' | 'minor' | 'patch';
+
+export function suggestVersionBump(changes: ChangeItem[]): { bump: BumpType; reason: string; suggested: string } | null {
+  if (changes.length === 0) return null;
+  
+  const hasBreaking = changes.some(c => 
+    c.description.toLowerCase().includes('breaking') || 
+    c.type === 'removed'
+  );
+  const hasFeature = changes.some(c => c.type === 'added');
+  const hasDeprecation = changes.some(c => c.type === 'deprecated');
+  
+  if (hasBreaking) {
+    return { bump: 'major', reason: 'Contains breaking changes or removals', suggested: '' };
+  }
+  if (hasFeature || hasDeprecation) {
+    return { bump: 'minor', reason: 'Contains new features or deprecations', suggested: '' };
+  }
+  return { bump: 'patch', reason: 'Contains fixes and improvements', suggested: '' };
+}
+
+export function applyBump(currentVersion: string, bump: BumpType): string {
+  const parts = currentVersion.split('.').map(Number);
+  const [major = 0, minor = 0, patch = 0] = parts;
+  if (bump === 'major') return `${major + 1}.0.0`;
+  if (bump === 'minor') return `${major}.${minor + 1}.0`;
+  return `${major}.${minor}.${patch + 1}`;
+}
+
 export function generateConventionalCommits(releases: Release[]): string {
   const lines: string[] = [];
   lines.push('# Conventional Commits');
