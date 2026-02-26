@@ -6,6 +6,7 @@ import {
   type ChangeItem, 
   type ChangeType, 
   changeTypeConfig,
+  tagPresets,
   generateMarkdown,
   generateJSON,
   generateHTML,
@@ -548,6 +549,26 @@ export default function Home() {
       return { ...r, changes: r.changes.filter(c => c.id !== changeId) };
     }));
   }, [updateReleases]);
+
+  const toggleTag = useCallback((releaseIndex: number, changeId: string, tag: string) => {
+    updateReleases(prev => prev.map((r, i) => {
+      if (i !== releaseIndex) return r;
+      return {
+        ...r,
+        changes: r.changes.map(c => {
+          if (c.id !== changeId) return c;
+          const tags = c.tags || [];
+          return {
+            ...c,
+            tags: tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]
+          };
+        })
+      };
+    }));
+  }, [updateReleases]);
+
+  // State for which change item has tag picker open
+  const [tagPickerOpen, setTagPickerOpen] = useState<string | null>(null);
 
   const moveChange = useCallback((releaseIndex: number, fromIdx: number, toIdx: number) => {
     updateReleases(prev => prev.map((r, i) => {
@@ -1295,17 +1316,68 @@ export default function Home() {
                         <span className={`${badgeClass(change.type)} px-2 py-1 rounded text-xs flex-shrink-0 mt-1`}>
                           {changeTypeConfig[change.type].emoji}
                         </span>
-                        <input
-                          type="text"
-                          value={change.description}
-                          onChange={e => updateChange(releaseIndex, change.id, e.target.value)}
-                          placeholder={`What was ${change.type}?`}
-                          className="input-field flex-1 rounded-lg px-3 py-2 text-white text-sm"
-                          autoFocus
-                        />
+                        <div className="flex-1 min-w-0">
+                          <input
+                            type="text"
+                            value={change.description}
+                            onChange={e => updateChange(releaseIndex, change.id, e.target.value)}
+                            placeholder={`What was ${change.type}?`}
+                            className="input-field w-full rounded-lg px-3 py-2 text-white text-sm"
+                            autoFocus
+                          />
+                          {/* Tags display */}
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            {(change.tags || []).map(tag => {
+                              const preset = tagPresets.find(p => p.label === tag);
+                              return (
+                                <span
+                                  key={tag}
+                                  onClick={() => toggleTag(releaseIndex, change.id, tag)}
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer hover:opacity-70 transition-opacity"
+                                  style={{ backgroundColor: preset ? preset.color + '20' : '#52525b20', color: preset?.color || '#a1a1aa', border: `1px solid ${preset ? preset.color + '40' : '#52525b40'}` }}
+                                  title="Click to remove"
+                                >
+                                  {preset?.emoji} {tag} ✕
+                                </span>
+                              );
+                            })}
+                            <button
+                              onClick={() => setTagPickerOpen(tagPickerOpen === change.id ? null : change.id)}
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 border border-zinc-800 hover:border-emerald-500/30 transition-all"
+                            >
+                              🏷️ {(change.tags || []).length > 0 ? '+' : 'Add tag'}
+                            </button>
+                          </div>
+                          {/* Tag picker dropdown */}
+                          {tagPickerOpen === change.id && (
+                            <div className="flex flex-wrap gap-1 mt-1.5 p-2 bg-zinc-800/80 rounded-lg border border-zinc-700 fade-in">
+                              {tagPresets.map(preset => {
+                                const isActive = (change.tags || []).includes(preset.label);
+                                return (
+                                  <button
+                                    key={preset.label}
+                                    onClick={() => toggleTag(releaseIndex, change.id, preset.label)}
+                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all ${
+                                      isActive
+                                        ? 'ring-1 scale-105'
+                                        : 'opacity-70 hover:opacity-100'
+                                    }`}
+                                    style={{
+                                      backgroundColor: preset.color + (isActive ? '30' : '15'),
+                                      color: preset.color,
+                                      borderColor: isActive ? preset.color : 'transparent',
+                                    }}
+                                  >
+                                    {preset.emoji} {preset.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={() => deleteChange(releaseIndex, change.id)}
-                          className="delete-btn p-2 text-zinc-600 hover:text-red-400 rounded transition-all"
+                          className="delete-btn p-2 text-zinc-600 hover:text-red-400 rounded transition-all flex-shrink-0"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -4,7 +4,19 @@ export interface ChangeItem {
   id: string;
   type: ChangeType;
   description: string;
+  tags?: string[];
 }
+
+export const tagPresets = [
+  { label: 'breaking', color: '#ef4444', emoji: '💥' },
+  { label: 'ui', color: '#8b5cf6', emoji: '🎨' },
+  { label: 'api', color: '#3b82f6', emoji: '🔌' },
+  { label: 'perf', color: '#f59e0b', emoji: '⚡' },
+  { label: 'docs', color: '#6b7280', emoji: '📝' },
+  { label: 'a11y', color: '#10b981', emoji: '♿' },
+  { label: 'i18n', color: '#ec4899', emoji: '🌍' },
+  { label: 'deps', color: '#06b6d4', emoji: '📦' },
+];
 
 export interface Release {
   version: string;
@@ -159,7 +171,8 @@ export function generateMarkdown(releases: Release[]): string {
         const config = changeTypeConfig[type as ChangeType];
         md += `### ${config.label}\n\n`;
         for (const item of items) {
-          md += `- ${item.description}\n`;
+          const tagStr = item.tags && item.tags.length > 0 ? ` \`${item.tags.join('` `')}\`` : '';
+          md += `- ${item.description}${tagStr}\n`;
         }
         md += '\n';
       }
