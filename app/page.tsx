@@ -1552,6 +1552,22 @@ export default function Home() {
                 )}
               </pre>
             </div>
+            {/* Word count & reading time */}
+            {(() => {
+              const text = getExport();
+              if (!text) return null;
+              const words = text.trim().split(/\s+/).length;
+              const chars = text.length;
+              const readingTime = Math.max(1, Math.ceil(words / 200));
+              return (
+                <div className="flex items-center gap-4 mt-2 px-1 text-xs text-zinc-500">
+                  <span>{words} words</span>
+                  <span>{chars.toLocaleString()} chars</span>
+                  <span>~{readingTime} min read</span>
+                  <span>{releases.filter(r => r.changes.some(c => c.description.trim())).length} release{releases.filter(r => r.changes.some(c => c.description.trim())).length !== 1 ? 's' : ''}</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
