@@ -294,6 +294,10 @@ export default function Home() {
     return { counts, totalChanges, releaseCount: releases.length, releasesByMonth };
   }, [releases]);
   
+  // Quick Add state
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAddText, setQuickAddText] = useState('');
+
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -483,6 +487,30 @@ export default function Home() {
     clearSavedReleases();
     setLastSaved(null);
   }, []);
+
+  // Quick Add handler - parse shorthand like +feature, !fix, ~change, -removed, *security, ^deprecated
+  const handleQuickAdd = useCallback(() => {
+    if (!quickAddText.trim()) return;
+    const lines = quickAddText.split('\n').filter(l => l.trim());
+    const newChanges: ChangeItem[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      let type: ChangeType = 'added';
+      let desc = trimmed;
+      if (trimmed.startsWith('+')) { type = 'added'; desc = trimmed.slice(1).trim(); }
+      else if (trimmed.startsWith('!')) { type = 'fixed'; desc = trimmed.slice(1).trim(); }
+      else if (trimmed.startsWith('~')) { type = 'changed'; desc = trimmed.slice(1).trim(); }
+      else if (trimmed.startsWith('-')) { type = 'removed'; desc = trimmed.slice(1).trim(); }
+      else if (trimmed.startsWith('*')) { type = 'security'; desc = trimmed.slice(1).trim(); }
+      else if (trimmed.startsWith('^')) { type = 'deprecated'; desc = trimmed.slice(1).trim(); }
+      if (desc) newChanges.push({ id: generateId(), type, description: desc });
+    }
+    if (newChanges.length > 0) {
+      updateReleases(prev => prev.map((r, i) => i === 0 ? { ...r, changes: [...r.changes, ...newChanges] } : r));
+    }
+    setQuickAddText('');
+    setShowQuickAdd(false);
+  }, [quickAddText, updateReleases]);
 
   // Handle import text change - parse preview
   const handleImportTextChange = useCallback((text: string) => {
@@ -734,6 +762,16 @@ export default function Home() {
               🔍 Search
             </button>
             <button
+              onClick={() => { setShowQuickAdd(!showQuickAdd); }}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                showQuickAdd
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              ⚡ Quick Add
+            </button>
+            <button
               onClick={() => { setShowImport(!showImport); }}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                 showImport
@@ -911,6 +949,42 @@ export default function Home() {
               </div>
             )}
         </div>
+
+        {/* Quick Add Panel */}
+        {showQuickAdd && (
+          <div className="mb-6 fade-in max-w-2xl mx-auto">
+            <div className="bg-zinc-900/80 border border-orange-500/30 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <span>⚡</span> Quick Add
+                </h3>
+                <button onClick={() => { setShowQuickAdd(false); setQuickAddText(''); }} className="text-zinc-500 hover:text-zinc-300 transition-colors">✕</button>
+              </div>
+              <p className="text-zinc-400 text-xs mb-3">
+                Type one change per line using prefixes: <code className="text-green-400">+</code> added · <code className="text-yellow-400">!</code> fixed · <code className="text-blue-400">~</code> changed · <code className="text-red-400">-</code> removed · <code className="text-purple-400">*</code> security · <code className="text-orange-400">^</code> deprecated
+              </p>
+              <textarea
+                value={quickAddText}
+                onChange={(e) => setQuickAddText(e.target.value)}
+                placeholder={`+New user dashboard\n!Fixed login timeout bug\n~Updated API response format\n-Removed legacy endpoints`}
+                rows={5}
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-sm font-mono focus:outline-none focus:border-orange-500 resize-y mb-3"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleQuickAdd(); } }}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-600">⌘+Enter to submit</span>
+                <button
+                  onClick={handleQuickAdd}
+                  disabled={!quickAddText.trim()}
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white text-sm font-medium transition-all"
+                >
+                  Add to Latest Release
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Import from Text Panel */}
         {showImport && (
