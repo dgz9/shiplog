@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { 
   type Release, 
   type ChangeItem, 
@@ -301,6 +301,9 @@ export default function Home() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
+  
+  // Keyboard shortcuts panel
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Import from text state
   const [showImport, setShowImport] = useState(false);
@@ -355,15 +358,27 @@ export default function Home() {
         e.preventDefault();
         redo();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearchBar(prev => !prev);
+      }
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        setShowShortcuts(prev => !prev);
+      }
       // Escape closes search
-      if (e.key === 'Escape' && showSearchBar) {
-        setShowSearchBar(false);
-        setSearchQuery('');
+      if (e.key === 'Escape') {
+        if (showSearchBar) { setShowSearchBar(false); setSearchQuery(''); }
+        if (showShortcuts) setShowShortcuts(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, showSearchBar]);
+  }, [undo, redo, showSearchBar, showShortcuts]);
+
+  // Refs for keyboard shortcuts that reference later-defined functions
+  const addReleaseRef = useRef<() => void>(() => {});
+  const copyToClipboardRef = useRef<() => void>(() => {});
 
   // Load saved releases and version history on mount
   useEffect(() => {
@@ -647,6 +662,26 @@ export default function Home() {
     setTimeout(() => setCopied(false), 2000);
   }, [getExport]);
 
+  // Keep refs in sync for keyboard shortcuts
+  addReleaseRef.current = addRelease;
+  copyToClipboardRef.current = copyToClipboard;
+
+  // Extra keyboard shortcuts using refs
+  useEffect(() => {
+    const handleExtraKeys = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n' && !e.shiftKey) {
+        e.preventDefault();
+        addReleaseRef.current();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e' && !e.shiftKey) {
+        e.preventDefault();
+        copyToClipboardRef.current();
+      }
+    };
+    window.addEventListener('keydown', handleExtraKeys);
+    return () => window.removeEventListener('keydown', handleExtraKeys);
+  }, []);
+
   const downloadFile = useCallback(() => {
     const content = getExport();
     const filenames: Record<string, string> = { markdown: 'CHANGELOG.md', json: 'changelog.json', html: 'changelog.html', yaml: 'changelog.yaml', toml: 'changelog.toml', rss: 'changelog.xml', commits: 'commits.txt', summary: 'release-notes.txt' };
@@ -780,6 +815,16 @@ export default function Home() {
               }`}
             >
               📥 Import
+            </button>
+            <button
+              onClick={() => setShowShortcuts(!showShortcuts)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                showShortcuts
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              ⌨️ Shortcuts
             </button>
           </div>
             
@@ -949,6 +994,38 @@ export default function Home() {
               </div>
             )}
         </div>
+
+        {/* Keyboard Shortcuts Panel */}
+        {showShortcuts && (
+          <div className="mb-6 fade-in max-w-xl mx-auto">
+            <div className="bg-zinc-900/80 border border-indigo-500/30 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <span>⌨️</span> Keyboard Shortcuts
+                </h3>
+                <button onClick={() => setShowShortcuts(false)} className="text-zinc-500 hover:text-zinc-300 transition-colors">✕</button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  ['⌘/Ctrl + N', 'New Release'],
+                  ['⌘/Ctrl + Z', 'Undo'],
+                  ['⌘/Ctrl + Shift + Z', 'Redo'],
+                  ['⌘/Ctrl + Y', 'Redo (alt)'],
+                  ['⌘/Ctrl + E', 'Copy Export'],
+                  ['⌘/Ctrl + K', 'Toggle Search'],
+                  ['?', 'Toggle Shortcuts'],
+                  ['Escape', 'Close Panels'],
+                ].map(([key, desc]) => (
+                  <div key={key} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-zinc-800/50">
+                    <kbd className="px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-xs text-zinc-300 font-mono whitespace-nowrap">{key}</kbd>
+                    <span className="text-sm text-zinc-400">{desc}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-zinc-600 mt-3 text-center">Press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 font-mono">?</kbd> anywhere to toggle this panel</p>
+            </div>
+          </div>
+        )}
 
         {/* Quick Add Panel */}
         {showQuickAdd && (
