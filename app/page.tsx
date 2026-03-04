@@ -580,6 +580,16 @@ export default function Home() {
     });
   }, [updateReleases]);
 
+  const moveRelease = useCallback((fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    updateReleases(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  }, [updateReleases]);
+
   const addChange = useCallback((releaseIndex: number, type: ChangeType) => {
     updateReleases(prev => prev.map((r, i) => {
       if (i !== releaseIndex) return r;
@@ -637,8 +647,11 @@ export default function Home() {
     }));
   }, [updateReleases]);
 
-  // Drag state for reordering
+  // Drag state for reordering changes within a release
   const [dragState, setDragState] = useState<{ releaseIndex: number; changeIndex: number } | null>(null);
+  // Drag state for reordering releases
+  const [dragReleaseIndex, setDragReleaseIndex] = useState<number | null>(null);
+  const [dragOverReleaseIndex, setDragOverReleaseIndex] = useState<number | null>(null);
 
   const getExport = useCallback(() => {
     const filtered = releases.map(r => ({
@@ -1381,10 +1394,17 @@ export default function Home() {
                 return (
                 <div 
                   key={releaseIndex} 
-                  className={`release-card rounded-2xl p-5 fade-in transition-opacity ${isDimmed ? 'opacity-30' : ''}`}
+                  draggable
+                  onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragReleaseIndex(releaseIndex); }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverReleaseIndex(releaseIndex); }}
+                  onDragLeave={() => { if (dragOverReleaseIndex === releaseIndex) setDragOverReleaseIndex(null); }}
+                  onDrop={(e) => { e.preventDefault(); if (dragReleaseIndex !== null && dragReleaseIndex !== releaseIndex) { moveRelease(dragReleaseIndex, releaseIndex); } setDragReleaseIndex(null); setDragOverReleaseIndex(null); }}
+                  onDragEnd={() => { setDragReleaseIndex(null); setDragOverReleaseIndex(null); }}
+                  className={`release-card rounded-2xl p-5 fade-in transition-all ${isDimmed ? 'opacity-30' : ''} ${dragReleaseIndex === releaseIndex ? 'opacity-40 scale-95' : ''} ${dragOverReleaseIndex === releaseIndex && dragReleaseIndex !== null && dragReleaseIndex !== releaseIndex ? 'ring-2 ring-emerald-500/50 ring-offset-2 ring-offset-zinc-950' : ''}`}
                 >
                   {/* Version & Date */}
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
+                    <span className="text-zinc-600 cursor-grab active:cursor-grabbing self-center mr-1 opacity-50 hover:opacity-100 transition-opacity" title="Drag to reorder releases">⠿</span>
                     <div className="flex gap-2 sm:gap-3 flex-1">
                       <div className="flex-1">
                         <label className="text-xs text-zinc-500 mb-1 block">Version</label>
