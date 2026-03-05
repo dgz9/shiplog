@@ -304,6 +304,8 @@ export default function Home() {
   
   // Keyboard shortcuts panel
   const [showShortcuts, setShowShortcuts] = useState(false);
+  // Timeline view
+  const [showTimeline, setShowTimeline] = useState(false);
 
   // Import from text state
   const [showImport, setShowImport] = useState(false);
@@ -839,6 +841,16 @@ export default function Home() {
             >
               ⌨️ Shortcuts
             </button>
+            <button
+              onClick={() => setShowTimeline(!showTimeline)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                showTimeline
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              📅 Timeline
+            </button>
           </div>
             
             {showTemplates && (
@@ -1327,6 +1339,109 @@ export default function Home() {
                     })}
                   </div>
                 )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Release Timeline */}
+        {showTimeline && (() => {
+          const sorted = [...releases]
+            .filter(r => r.changes.some(c => c.description.trim()))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          
+          if (sorted.length === 0) return (
+            <div className="mb-6 fade-in max-w-3xl mx-auto">
+              <div className="bg-zinc-900/50 border border-teal-500/30 rounded-xl p-6 text-center">
+                <p className="text-zinc-500">Add some releases with changes to see the timeline!</p>
+              </div>
+            </div>
+          );
+
+          const maxChanges = Math.max(...sorted.map(r => r.changes.filter(c => c.description.trim()).length), 1);
+
+          return (
+            <div className="mb-6 fade-in max-w-4xl mx-auto">
+              <div className="bg-zinc-900/50 border border-teal-500/30 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                  <span>📅</span> Release Timeline
+                  <span className="text-xs text-zinc-500 font-normal">({sorted.length} releases)</span>
+                </h3>
+                
+                <div className="relative">
+                  {/* Timeline line */}
+                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-zinc-800" />
+                  
+                  <div className="space-y-6">
+                    {sorted.map((release, i) => {
+                      const changeCount = release.changes.filter(c => c.description.trim()).length;
+                      const barWidth = Math.round((changeCount / maxChanges) * 100);
+                      const typeCounts: Record<string, number> = {};
+                      release.changes.filter(c => c.description.trim()).forEach(c => {
+                        typeCounts[c.type] = (typeCounts[c.type] || 0) + 1;
+                      });
+                      const isLatest = i === sorted.length - 1;
+                      
+                      return (
+                        <div key={i} className="relative pl-16 group">
+                          {/* Timeline dot */}
+                          <div className={`absolute left-4 top-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                            isLatest
+                              ? 'bg-emerald-500 border-emerald-400 shadow-lg shadow-emerald-500/30'
+                              : 'bg-zinc-800 border-zinc-600 group-hover:border-emerald-500/50'
+                          }`}>
+                            {isLatest && <span className="w-2 h-2 rounded-full bg-white" />}
+                          </div>
+                          
+                          {/* Content */}
+                          <div className={`bg-zinc-800/50 rounded-xl p-4 border transition-all ${
+                            isLatest ? 'border-emerald-500/30' : 'border-zinc-800 group-hover:border-zinc-700'
+                          }`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <span className="text-emerald-400 font-bold font-mono">v{release.version}</span>
+                                {isLatest && (
+                                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-full">Latest</span>
+                                )}
+                              </div>
+                              <span className="text-xs text-zinc-500">{release.date}</span>
+                            </div>
+                            
+                            {/* Change type breakdown bar */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex-1 h-2 bg-zinc-900 rounded-full overflow-hidden flex">
+                                {(Object.keys(changeTypeConfig) as ChangeType[]).map(type => {
+                                  const count = typeCounts[type] || 0;
+                                  if (count === 0) return null;
+                                  const pct = (count / changeCount) * barWidth;
+                                  const colors: Record<string, string> = {
+                                    added: 'bg-green-500', changed: 'bg-blue-500', fixed: 'bg-yellow-500',
+                                    removed: 'bg-red-500', security: 'bg-purple-500', deprecated: 'bg-orange-500',
+                                  };
+                                  return <div key={type} className={`h-full ${colors[type]}`} style={{ width: `${pct}%` }} />;
+                                })}
+                              </div>
+                              <span className="text-xs text-zinc-500 w-8 text-right">{changeCount}</span>
+                            </div>
+                            
+                            {/* Change type pills */}
+                            <div className="flex flex-wrap gap-1">
+                              {(Object.keys(changeTypeConfig) as ChangeType[]).map(type => {
+                                const count = typeCounts[type] || 0;
+                                if (count === 0) return null;
+                                return (
+                                  <span key={type} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-zinc-900/80 text-zinc-400">
+                                    {changeTypeConfig[type].emoji} {count}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           );
