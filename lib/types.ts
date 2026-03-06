@@ -5,6 +5,7 @@ export interface ChangeItem {
   type: ChangeType;
   description: string;
   tags?: string[];
+  contributor?: string;
 }
 
 export const tagPresets = [
@@ -172,7 +173,8 @@ export function generateMarkdown(releases: Release[]): string {
         md += `### ${config.label}\n\n`;
         for (const item of items) {
           const tagStr = item.tags && item.tags.length > 0 ? ` \`${item.tags.join('` `')}\`` : '';
-          md += `- ${item.description}${tagStr}\n`;
+          const contribStr = item.contributor ? ` (@${item.contributor.replace(/^@/, '')})` : '';
+          md += `- ${item.description}${tagStr}${contribStr}\n`;
         }
         md += '\n';
       }

@@ -612,6 +612,16 @@ export default function Home() {
     }));
   }, [updateReleases]);
 
+  const updateChangeContributor = useCallback((releaseIndex: number, changeId: string, contributor: string) => {
+    updateReleases(prev => prev.map((r, i) => {
+      if (i !== releaseIndex) return r;
+      return {
+        ...r,
+        changes: r.changes.map(c => c.id === changeId ? { ...c, contributor: contributor || undefined } : c)
+      };
+    }));
+  }, [updateReleases]);
+
   const deleteChange = useCallback((releaseIndex: number, changeId: string) => {
     updateReleases(prev => prev.map((r, i) => {
       if (i !== releaseIndex) return r;
@@ -1644,14 +1654,24 @@ export default function Home() {
                           {changeTypeConfig[change.type].emoji}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <input
-                            type="text"
-                            value={change.description}
-                            onChange={e => updateChange(releaseIndex, change.id, e.target.value)}
-                            placeholder={`What was ${change.type}?`}
-                            className="input-field w-full rounded-lg px-3 py-2 text-white text-sm"
-                            autoFocus
-                          />
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              value={change.description}
+                              onChange={e => updateChange(releaseIndex, change.id, e.target.value)}
+                              placeholder={`What was ${change.type}?`}
+                              className="input-field flex-1 rounded-lg px-3 py-2 text-white text-sm"
+                              autoFocus
+                            />
+                            <input
+                              type="text"
+                              value={change.contributor || ''}
+                              onChange={e => updateChangeContributor(releaseIndex, change.id, e.target.value)}
+                              placeholder="@user"
+                              className="input-field w-20 sm:w-24 rounded-lg px-2 py-2 text-white text-xs"
+                              title="Contributor (optional)"
+                            />
+                          </div>
                           {/* Tags display */}
                           <div className="flex flex-wrap items-center gap-1 mt-1">
                             {(change.tags || []).map(tag => {
