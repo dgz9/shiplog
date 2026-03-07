@@ -1876,19 +1876,54 @@ export default function Home() {
                 )}
               </pre>
             </div>
-            {/* Word count & reading time */}
+            {/* Word count, reading time & changelog mood */}
             {(() => {
               const text = getExport();
               if (!text) return null;
               const words = text.trim().split(/\s+/).length;
               const chars = text.length;
               const readingTime = Math.max(1, Math.ceil(words / 200));
+              const activeReleases = releases.filter(r => r.changes.some(c => c.description.trim()));
+              
+              // Compute changelog mood
+              const allChanges = releases.flatMap(r => r.changes.filter(c => c.description.trim()));
+              const typeCounts: Record<string, number> = {};
+              allChanges.forEach(c => { typeCounts[c.type] = (typeCounts[c.type] || 0) + 1; });
+              const total = allChanges.length;
+              
+              let mood = { emoji: '📝', label: 'Getting started', color: 'text-zinc-400' };
+              if (total > 0) {
+                const addedPct = (typeCounts['added'] || 0) / total;
+                const fixedPct = (typeCounts['fixed'] || 0) / total;
+                const removedPct = (typeCounts['removed'] || 0) / total;
+                const securityPct = (typeCounts['security'] || 0) / total;
+                const deprecatedPct = (typeCounts['deprecated'] || 0) / total;
+                
+                if (securityPct >= 0.4) mood = { emoji: '🔒', label: 'Security focused', color: 'text-purple-400' };
+                else if (fixedPct >= 0.5) mood = { emoji: '🩹', label: 'Bug squashing', color: 'text-yellow-400' };
+                else if (removedPct >= 0.4) mood = { emoji: '🧹', label: 'Spring cleaning', color: 'text-red-400' };
+                else if (deprecatedPct >= 0.3) mood = { emoji: '🌅', label: 'Sunsetting', color: 'text-orange-400' };
+                else if (addedPct >= 0.6) mood = { emoji: '🚀', label: 'Feature-packed', color: 'text-emerald-400' };
+                else if (addedPct >= 0.3 && fixedPct >= 0.2) mood = { emoji: '⚡', label: 'Balanced update', color: 'text-blue-400' };
+                else mood = { emoji: '🎯', label: 'Steady progress', color: 'text-cyan-400' };
+                
+                if (total >= 15) mood = { ...mood, emoji: '🎉', label: mood.label + ' (big release!)' };
+              }
+              
               return (
-                <div className="flex items-center gap-4 mt-2 px-1 text-xs text-zinc-500">
-                  <span>{words} words</span>
-                  <span>{chars.toLocaleString()} chars</span>
-                  <span>~{readingTime} min read</span>
-                  <span>{releases.filter(r => r.changes.some(c => c.description.trim())).length} release{releases.filter(r => r.changes.some(c => c.description.trim())).length !== 1 ? 's' : ''}</span>
+                <div className="flex items-center justify-between mt-2 px-1">
+                  <div className="flex items-center gap-4 text-xs text-zinc-500">
+                    <span>{words} words</span>
+                    <span>{chars.toLocaleString()} chars</span>
+                    <span>~{readingTime} min read</span>
+                    <span>{activeReleases.length} release{activeReleases.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  {total > 0 && (
+                    <div className={`flex items-center gap-1.5 text-xs ${mood.color}`} title="Changelog mood based on change types">
+                      <span>{mood.emoji}</span>
+                      <span className="font-medium">{mood.label}</span>
+                    </div>
+                  )}
                 </div>
               );
             })()}
