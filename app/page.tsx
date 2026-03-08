@@ -1925,6 +1925,30 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+                {/* Emoji Summary Line */}
+                {total > 0 && (() => {
+                  const emojiMap: Record<string, string> = {
+                    added: '✨', changed: '🔄', fixed: '🐛', removed: '🗑️', security: '🔒', deprecated: '📦'
+                  };
+                  const emojiLine = allChanges.map(c => emojiMap[c.type] || '📝').join('');
+                  const truncated = emojiLine.length > 40 ? emojiLine.slice(0, 40) + '…' : emojiLine;
+                  return (
+                    <div className="mt-2 flex items-center justify-between">
+                      <button
+                        onClick={async () => {
+                          try { await navigator.clipboard.writeText(emojiLine); } catch {}
+                        }}
+                        className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 hover:border-emerald-500/30 transition-all text-left"
+                        title="Click to copy emoji summary"
+                      >
+                        <span className="text-xs text-zinc-600 flex-shrink-0">📊</span>
+                        <span className="text-xs tracking-wider">{truncated}</span>
+                        <span className="text-[10px] text-zinc-600 group-hover:text-emerald-400 flex-shrink-0 transition-colors">copy</span>
+                      </button>
+                      <span className="text-[10px] text-zinc-600">Emoji summary · {total} changes</span>
+                    </div>
+                  );
+                })()}
               );
             })()}
           </div>
