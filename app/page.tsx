@@ -1305,6 +1305,18 @@ export default function Home() {
           const totalReleases = releases.length;
           const avgPerRelease = totalReleases > 0 ? (totalChanges / totalReleases).toFixed(1) : '0';
           
+          // Contributor stats
+          const contributorCounts: Record<string, number> = {};
+          allChanges.forEach(c => {
+            const contributor = c.contributor?.trim();
+            if (contributor) {
+              contributorCounts[contributor] = (contributorCounts[contributor] || 0) + 1;
+            }
+          });
+          const topContributors = Object.entries(contributorCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+          const totalWords = allChanges.reduce((sum, c) => sum + c.description.trim().split(/\s+/).length, 0);
+          const totalChars = allChanges.reduce((sum, c) => sum + c.description.trim().length, 0);
+          
           return (
             <div className="mb-6 fade-in">
               <div className="max-w-2xl mx-auto bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
@@ -1347,6 +1359,34 @@ export default function Home() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+                
+                {/* Extra metrics */}
+                {totalChanges > 0 && (
+                  <div className="mt-4 pt-3 border-t border-zinc-800">
+                    <div className="flex items-center gap-4 text-xs text-zinc-500">
+                      <span>📝 {totalWords} words</span>
+                      <span>🔤 {totalChars.toLocaleString()} chars</span>
+                      <span>📊 ~{Math.max(1, Math.ceil(totalWords / 200))} min read</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Contributor leaderboard */}
+                {topContributors.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-zinc-800">
+                    <p className="text-xs text-zinc-500 mb-2">👥 Top Contributors</p>
+                    <div className="space-y-1.5">
+                      {topContributors.map(([name, count], i) => (
+                        <div key={name} className="flex items-center gap-2 text-sm">
+                          <span className="text-zinc-600 w-5 text-right">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}</span>
+                          <span className="text-zinc-300 flex-1 truncate">{name}</span>
+                          <span className="text-emerald-400 font-medium">{count}</span>
+                          <span className="text-zinc-600 text-xs">change{count !== 1 ? 's' : ''}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1911,6 +1951,7 @@ export default function Home() {
               }
               
               return (
+                <>
                 <div className="flex items-center justify-between mt-2 px-1">
                   <div className="flex items-center gap-4 text-xs text-zinc-500">
                     <span>{words} words</span>
@@ -1949,6 +1990,7 @@ export default function Home() {
                     </div>
                   );
                 })()}
+                </>
               );
             })()}
           </div>
